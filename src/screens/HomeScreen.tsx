@@ -110,28 +110,11 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* Dynamic greeting */}
-          <Text style={[styles.prompt, { color: season.text }]}>
-            {greeting || season.prompt}
-          </Text>
-
           {/* Streak */}
           <View style={styles.streakContainer}>
             <StreakRow sessions={sessions} seasonColor={season.color} />
             <Text style={[styles.streakLabel, { color: season.textSecondary }]}>
               last 14 days
-            </Text>
-          </View>
-
-          {/* Contextual insight */}
-          <View style={[styles.insightCard, { backgroundColor: season.cardBg }]}>
-            <Text style={[styles.insightWeather, { color: season.textSecondary }]}>
-              Keep moving
-            </Text>
-            <Text style={[styles.insightText, { color: season.textSecondary }]}>
-              {sessions.length > 0
-                ? `You've logged ${sessions.length} movement${sessions.length === 1 ? '' : 's'} recently. Every session matters.`
-                : 'Start your journey by logging your first movement.'}
             </Text>
           </View>
 
