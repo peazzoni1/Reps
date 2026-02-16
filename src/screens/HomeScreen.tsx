@@ -18,13 +18,12 @@ import { SEASONS, getCurrentSeason, getDayLabel, getMovementIcon, getSeasonDay, 
 import { getGreetingWithWeather } from '../utils/greetings';
 import { getCurrentWeather } from '../services/weather';
 import StreakRow from '../components/StreakRow';
-import QuickLogModal from '../components/QuickLogModal';
+import QuickLogCard from '../components/QuickLogCard';
 import StoryView from '../components/StoryView';
 
 export default function HomeScreen() {
   const [currentSeason] = useState(getCurrentSeason());
   const [sessions, setSessions] = useState<MovementSession[]>([]);
-  const [showLog, setShowLog] = useState(false);
   const [showStory, setShowStory] = useState(false);
   const [greeting, setGreeting] = useState<string>('');
   const season = SEASONS[currentSeason];
@@ -77,7 +76,6 @@ export default function HomeScreen() {
       entry.note,
       entry.workoutDetails
     );
-    setShowLog(false);
     loadSessions();
   };
 
@@ -93,7 +91,7 @@ export default function HomeScreen() {
           style={styles.scrollView}
           contentContainerStyle={[
             styles.content,
-            { paddingTop: insets.top + 56, paddingBottom: 120 },
+            { paddingTop: insets.top + 56, paddingBottom: 40 },
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -134,6 +132,9 @@ export default function HomeScreen() {
             </View>
             <Text style={[styles.storyArrow, { color: season.textSecondary }]}>→</Text>
           </TouchableOpacity>
+
+          {/* Quick log card */}
+          <QuickLogCard season={season} onSave={handleSave} />
 
           {/* Recent sessions */}
           {recentSessions.length > 0 && (
@@ -177,29 +178,7 @@ export default function HomeScreen() {
           )}
         </ScrollView>
 
-        {/* Log button */}
-        <View
-          style={[
-            styles.logButtonContainer,
-            { paddingBottom: insets.bottom + 16, backgroundColor: season.bgEnd },
-          ]}
-        >
-          <TouchableOpacity
-            onPress={() => setShowLog(true)}
-            style={[styles.logButton, { backgroundColor: season.color }]}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.logButtonText}>Log Movement</Text>
-          </TouchableOpacity>
-        </View>
       </LinearGradient>
-
-      <QuickLogModal
-        visible={showLog}
-        season={season}
-        onClose={() => setShowLog(false)}
-        onSave={handleSave}
-      />
 
       <StoryView
         visible={showStory}
@@ -331,30 +310,5 @@ const styles = StyleSheet.create({
   sessionDetails: {
     fontSize: 12,
     marginTop: 2,
-  },
-  logButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  logButton: {
-    width: '100%',
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  logButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.2,
   },
 });
