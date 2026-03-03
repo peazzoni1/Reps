@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SeasonTheme, MovementType, FeelingType, WorkoutExercise } from '../types';
 import { MOVEMENT_TYPES, FEELINGS } from '../constants/seasonal';
-import { Spacing, BorderRadius, Typography } from '../theme';
+import { getCustomTags, addCustomTag } from '../services/storage';
 
 // Helper to convert hex to rgba
 const hexToRgba = (hex: string, alpha: number): string => {
@@ -40,12 +40,22 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([
     { name: '', sets: undefined, reps: undefined, weight: undefined }
   ]);
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [showCustomTagInput, setShowCustomTagInput] = useState(false);
+  const [customTagInput, setCustomTagInput] = useState('');
 
   // Animation values
   const feelingOpacity = useRef(new Animated.Value(0)).current;
   const feelingTranslateY = useRef(new Animated.Value(12)).current;
   const saveOpacity = useRef(new Animated.Value(0)).current;
   const saveTranslateY = useRef(new Animated.Value(12)).current;
+
+  // Load custom tags when modal opens
+  useEffect(() => {
+    if (visible) {
+      loadCustomTags();
+    }
+  }, [visible]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -57,6 +67,8 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
         setNote('');
         setShowNote(false);
         setShowWorkoutDetails(false);
+        setShowCustomTagInput(false);
+        setCustomTagInput('');
         setWorkoutExercises([{ name: '', sets: undefined, reps: undefined, weight: undefined }]);
         feelingOpacity.setValue(0);
         feelingTranslateY.setValue(12);
@@ -65,6 +77,11 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
       }, 300);
     }
   }, [visible]);
+
+  const loadCustomTags = async () => {
+    const tags = await getCustomTags();
+    setCustomTags(tags);
+  };
 
   // Animate feeling section when type is selected
   useEffect(() => {
@@ -123,7 +140,7 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
     onClose();
   };
 
-  const updateExercise = (index: number, field: keyof WorkoutExercise, value: string | number) => {
+  const updateExercise = (index: number, field: keyof WorkoutExercise, value: string | number | undefined) => {
     const updated = [...workoutExercises];
     updated[index] = { ...updated[index], [field]: value };
     setWorkoutExercises(updated);
@@ -136,6 +153,18 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
   const removeExercise = (index: number) => {
     if (workoutExercises.length > 1) {
       setWorkoutExercises(workoutExercises.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleAddCustomTag = async () => {
+    const trimmedTag = customTagInput.trim();
+    if (trimmedTag) {
+      await addCustomTag(trimmedTag);
+      await loadCustomTags();
+      setSelectedFeeling(trimmedTag as FeelingType);
+      setCustomTagInput('');
+      setShowCustomTagInput(false);
+      Keyboard.dismiss();
     }
   };
 
@@ -153,7 +182,7 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
 
             <View>
             <Text style={[styles.question, { color: season.text }]}>
-              What did you do?
+              What did you do today?
             </Text>
 
             <View style={styles.optionsContainer}>
@@ -198,6 +227,7 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
                 </Text>
 
                 <View style={styles.optionsContainer}>
+                  {/* Default feelings */}
                   {FEELINGS.map((f) => (
                     <TouchableOpacity
                       key={f.id}
@@ -223,10 +253,73 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
                       </Text>
                     </TouchableOpacity>
                   ))}
+
+                  {/* Custom tags */}
+                  {customTags.map((tag) => (
+                    <TouchableOpacity
+                      key={tag}
+                      onPress={() => setSelectedFeeling(tag as FeelingType)}
+                      style={[
+                        styles.option,
+                        selectedFeeling === tag
+                          ? {
+                              borderColor: season.color,
+                              backgroundColor: hexToRgba(season.color, 0.1),
+                            }
+                          : styles.optionInactive,
+                      ]}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.optionText,
+                          { color: selectedFeeling === tag ? season.color : season.textSecondary },
+                        ]}
+                      >
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* Add custom tag button */}
+                  {!showCustomTagInput && (
+                    <TouchableOpacity
+                      onPress={() => setShowCustomTagInput(true)}
+                      style={[styles.option, styles.addCustomOption]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.optionText, { color: season.textSecondary, opacity: 0.6 }]}>
+                        + Custom
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
+                {/* Custom tag input */}
+                {showCustomTagInput && (
+                  <View style={styles.customTagInputContainer}>
+                    <TextInput
+                      value={customTagInput}
+                      onChangeText={setCustomTagInput}
+                      placeholder="Type your feeling..."
+                      placeholderTextColor={hexToRgba(season.textSecondary, 0.5)}
+                      autoFocus
+                      returnKeyType="done"
+                      onSubmitEditing={handleAddCustomTag}
+                      style={[styles.customTagInput, { color: season.text, borderColor: hexToRgba(season.color, 0.2) }]}
+                    />
+                    <TouchableOpacity
+                      onPress={handleAddCustomTag}
+                      style={[styles.addTagButton, { backgroundColor: season.color }]}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.addTagButtonText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* Workout details section - only for "Lifted" */}
-                {selectedType === 'lifted' && !showWorkoutDetails && (
+                {selectedType === 'strength_training' && !showWorkoutDetails && (
                   <TouchableOpacity
                     onPress={() => setShowWorkoutDetails(true)}
                     style={styles.addNoteButton}
@@ -238,7 +331,7 @@ export default function QuickLogModal({ visible, season, onClose, onSave }: Quic
                   </TouchableOpacity>
                 )}
 
-                {selectedType === 'lifted' && showWorkoutDetails && (
+                {selectedType === 'strength_training' && showWorkoutDetails && (
                   <View style={styles.workoutSection}>
                     {workoutExercises.map((exercise, index) => (
                       <View key={index} style={styles.exerciseRow}>
@@ -474,5 +567,31 @@ const styles = StyleSheet.create({
   },
   addExerciseButton: {
     marginTop: 8,
+  },
+  addCustomOption: {
+    borderStyle: 'dashed',
+  },
+  customTagInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  customTagInput: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 14,
+  },
+  addTagButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  addTagButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

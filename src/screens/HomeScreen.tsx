@@ -1,192 +1,289 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Animated,
+  Modal,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
+import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MovementSession, MovementType, FeelingType, WorkoutExercise } from '../types';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { FeelingType, MovementType, WorkoutExercise } from '../types';
 import {
-  getRecentMovementSessions,
   createMovementSession,
+  getRecentDailySnapshots,
+  getCachedDailyMessage,
+  storeDailyMessage,
+  getPreviousDailyMessages,
+  toLocalDateStr,
+  DailyCheckInMessage,
 } from '../services/storage';
-import { SEASONS, getCurrentSeason, getDayLabel, getMovementIcon, getSeasonDay, MOVEMENT_TYPES } from '../constants/seasonal';
-import { getGreetingWithWeather } from '../utils/greetings';
-import { getCurrentWeather } from '../services/weather';
-import StreakRow from '../components/StreakRow';
+import { getBlendedTheme } from '../constants/seasonal';
+import { Colors, Typography, Spacing, BorderRadius } from '../theme';
+import { supabase } from '../lib/supabase';
 import QuickLogCard from '../components/QuickLogCard';
-import StoryView from '../components/StoryView';
+import { getDailyCheckIn } from '../services/anthropic';
+import { TabParamList } from '../navigation/TabNavigator';
+
+type WeatherInfo = { temp: number; iconName: string };
+
+function getWeatherIconName(code: number): string {
+  if (code === 0) return 'sunny-outline';
+  if (code <= 2) return 'partly-sunny-outline';
+  if (code <= 48) return 'cloudy-outline';
+  if (code <= 67) return 'rainy-outline';
+  if (code <= 77) return 'snow-outline';
+  if (code <= 82) return 'rainy-outline';
+  return 'thunderstorm-outline';
+}
+
+type HomeNavigationProp = BottomTabNavigationProp<TabParamList, 'Today'>;
 
 export default function HomeScreen() {
-  const [currentSeason] = useState(getCurrentSeason());
-  const [sessions, setSessions] = useState<MovementSession[]>([]);
-  const [showStory, setShowStory] = useState(false);
-  const [greeting, setGreeting] = useState<string>('');
-  const season = SEASONS[currentSeason];
+  const navigation = useNavigation<HomeNavigationProp>();
+  const [profileVisible, setProfileVisible] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [coachMessage, setCoachMessage] = useState<DailyCheckInMessage | null>(null);
+  const [coachLoading, setCoachLoading] = useState(true);
+  const [coachExpanded, setCoachExpanded] = useState(false);
+  const [coachFeedback, setCoachFeedback] = useState<'up' | 'down' | null>(null);
+  const [sessionCount, setSessionCount] = useState(0);
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [fontsLoaded] = useFonts({ Nunito_700Bold, Nunito_600SemiBold });
+  const season = getBlendedTheme();
   const insets = useSafeAreaInsets();
 
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
-
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.04,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserEmail(user?.email ?? null);
+    });
   }, []);
 
-  const loadSessions = async () => {
-    const data = await getRecentMovementSessions(14);
-    setSessions(data);
-  };
-
-  const loadGreeting = async () => {
-    // Fetch weather data (cached for 1 hour)
-    const weather = await getCurrentWeather();
-
-    // Generate greeting with weather if available
-    const newGreeting = getGreetingWithWeather(weather?.temperature, weather?.condition);
-    setGreeting(newGreeting);
-  };
-
   useEffect(() => {
-    loadSessions();
-    loadGreeting();
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const { latitude, longitude } = loc.coords;
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
+        );
+        const data = await res.json();
+        setWeather({
+          temp: Math.round(data.current.temperature_2m),
+          iconName: getWeatherIconName(data.current.weather_code),
+        });
+      } catch {}
+    })();
   }, []);
 
-  const handleSave = async (entry: { type: MovementType; feeling: FeelingType; note?: string; workoutDetails?: WorkoutExercise[] }) => {
-    const typeData = MOVEMENT_TYPES.find((m) => m.id === entry.type);
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    const loadMessage = async () => {
+      const [cached, recentData, previousMessages] = await Promise.all([
+        getCachedDailyMessage(),
+        getRecentDailySnapshots(5),
+        getPreviousDailyMessages(),
+      ]);
+      const count = recentData.reduce((sum, d) => sum + d.exercises.length, 0);
+      if (!cancelled) setSessionCount(count);
+      if (cached) {
+        if (!cancelled) { setCoachMessage(cached); setCoachLoading(false); }
+        return;
+      }
+      try {
+        const message = await getDailyCheckIn(recentData, previousMessages);
+        if (!cancelled && message) {
+          const entry: DailyCheckInMessage = {
+            date: toLocalDateStr(new Date()),
+            headline: message.headline,
+            body: message.body,
+          };
+          await storeDailyMessage(entry);
+          setCoachMessage(entry);
+        }
+      } catch {}
+      if (!cancelled) setCoachLoading(false);
+    };
+    loadMessage();
+    return () => { cancelled = true; };
+  }, []));
+
+  const handleTellMeMore = () => {
+    if (coachMessage) {
+      navigation.navigate('Coach', {
+        initialMessage: `${coachMessage.headline}\n\n${coachMessage.body}`,
+      });
+    }
+  };
+
+  const handleSave = async (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[] }) => {
     await createMovementSession(
       entry.type,
-      entry.feeling,
-      typeData?.label || 'Movement',
+      entry.feelings,
+      entry.label,
       entry.note,
       entry.workoutDetails
     );
-    loadSessions();
   };
 
-  const recentSessions = sessions.slice(0, 5);
+  const handleLogout = async () => {
+    Alert.alert('Log out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: async () => {
+          setProfileVisible(false);
+          await supabase.auth.signOut();
+        },
+      },
+    ]);
+  };
+
+  const initials = userEmail ? userEmail[0].toUpperCase() : '?';
+
+  const ACCENT = '#3d7a8a';
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={[season.bgStart, season.bgMiddle, season.bgEnd]}
-        style={styles.gradient}
+    <LinearGradient colors={['#f0f6fa', '#fdf4f0']} style={styles.container}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <Text style={[styles.headerTitle, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>Today</Text>
+        {weather ? (
+          <View style={styles.weatherBadge}>
+            <Ionicons name={weather.iconName as any} size={14} color={ACCENT} />
+            <Text style={styles.weatherText}>{weather.temp}°</Text>
+          </View>
+        ) : (
+          <View style={styles.weatherBadge} />
+        )}
+        <TouchableOpacity style={styles.userButton} onPress={() => setProfileVisible(true)} activeOpacity={0.8}>
+          <Text style={styles.userInitials}>{initials}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingBottom: 40 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[
-            styles.content,
-            { paddingTop: insets.top + 56, paddingBottom: 40 },
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Season indicator */}
-          <View style={styles.seasonIndicator}>
-            <Animated.View
-              style={[
-                styles.seasonDot,
-                { backgroundColor: season.color, transform: [{ scale: pulseAnim }] },
-              ]}
-            />
-            <Text style={[styles.seasonText, { color: season.color }]}>
-              {season.name.toUpperCase()} · DAY {getSeasonDay().currentDay} of {getSeasonDay().totalDays}
-            </Text>
+        {/* AI Coach Daily Check-In */}
+        <View style={styles.coachCard}>
+          <LinearGradient
+            colors={['#ffffff', '#fff5f2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.coachAccentBar} />
+          <View style={styles.coachCardContent}>
+            <Text style={[styles.coachLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>✦ AI Coach · Daily Check-In</Text>
+            {coachLoading ? (
+              <View style={styles.coachMessagePlaceholder}>
+                <View style={[styles.placeholderLine, { width: '60%', height: 16, marginBottom: 8 }]} />
+                <View style={[styles.placeholderLine, { width: '90%' }]} />
+                <View style={[styles.placeholderLine, { width: '65%', marginTop: 6 }]} />
+              </View>
+            ) : coachMessage ? (
+              <>
+                <Text style={[styles.coachHeadline, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>
+                  {coachMessage.headline}
+                </Text>
+                <Text style={styles.coachBody} numberOfLines={coachExpanded ? undefined : 3}>
+                  {coachMessage.body}
+                </Text>
+                {!coachExpanded && (
+                  <TouchableOpacity onPress={() => setCoachExpanded(true)} activeOpacity={0.7}>
+                    <Text style={styles.readMore}>Read more</Text>
+                  </TouchableOpacity>
+                )}
+                {sessionCount > 0 && (
+                  <Text style={styles.coachCaption}>
+                    ↑ Based on your last {sessionCount} session{sessionCount !== 1 ? 's' : ''}
+                  </Text>
+                )}
+                {coachExpanded && (
+                  <>
+                    <TouchableOpacity onPress={handleTellMeMore} activeOpacity={0.7} style={styles.tellMeMoreRow}>
+                      <Text style={styles.tellMeMore}>Tell me more →</Text>
+                    </TouchableOpacity>
+                    <View style={styles.feedbackRow}>
+                      <TouchableOpacity
+                        onPress={() => setCoachFeedback(coachFeedback === 'up' ? null : 'up')}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons
+                          name={coachFeedback === 'up' ? 'thumbs-up' : 'thumbs-up-outline'}
+                          size={18}
+                          color={coachFeedback === 'up' ? ACCENT : '#b0bec5'}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setCoachFeedback(coachFeedback === 'down' ? null : 'down')}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons
+                          name={coachFeedback === 'down' ? 'thumbs-down' : 'thumbs-down-outline'}
+                          size={18}
+                          color={coachFeedback === 'down' ? ACCENT : '#b0bec5'}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </>
+            ) : null}
           </View>
+        </View>
 
-          {/* Streak */}
-          <View style={styles.streakContainer}>
-            <StreakRow sessions={sessions} seasonColor={season.color} />
-            <Text style={[styles.streakLabel, { color: season.textSecondary }]}>
-              last 14 days
-            </Text>
-          </View>
+        {/* Quick log card */}
+        <QuickLogCard season={{ ...season, color: '#3d7a8a', accent: '#7ab8c8', cardBg: '#fffaf8' }} onSave={handleSave} />
 
-          {/* The recap button */}
+      </ScrollView>
+
+      {/* Profile modal */}
+      <Modal visible={profileVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
           <TouchableOpacity
-            onPress={() => setShowStory(true)}
-            style={[styles.storyButton, { backgroundColor: season.cardBg }]}
-            activeOpacity={0.7}
-          >
-            <View>
-              <Text style={[styles.storyLabel, { color: season.textSecondary }]}>
-                THE RECAP
-              </Text>
-              <Text style={[styles.storyTitle, { color: season.text }]}>
-                {sessions.length} session{sessions.length === 1 ? '' : 's'} this {season.name.toLowerCase()}
-              </Text>
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setProfileVisible(false)}
+          />
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
+            <View style={styles.modalHandle} />
+
+            {/* Avatar */}
+            <View style={styles.avatar}>
+              <Text style={styles.avatarInitials}>{initials}</Text>
             </View>
-            <Text style={[styles.storyArrow, { color: season.textSecondary }]}>→</Text>
-          </TouchableOpacity>
 
-          {/* Quick log card */}
-          <QuickLogCard season={season} onSave={handleSave} />
+            {/* Email */}
+            {userEmail && (
+              <Text style={styles.email}>{userEmail}</Text>
+            )}
 
-          {/* Recent sessions */}
-          {recentSessions.length > 0 && (
-            <View style={styles.recentSection}>
-              <Text style={[styles.recentLabel, { color: season.textSecondary }]}>
-                RECENT
-              </Text>
-              {recentSessions.map((session) => {
-                const sessionDate = new Date(session.date);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                sessionDate.setHours(0, 0, 0, 0);
-                const daysAgo = Math.floor(
-                  (today.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24)
-                );
+            <View style={styles.divider} />
 
-                return (
-                  <View key={session.id} style={styles.sessionCard}>
-                    <View
-                      style={[
-                        styles.sessionIcon,
-                        { backgroundColor: `${season.color}15` },
-                      ]}
-                    >
-                      <Text style={[styles.sessionIconText, { color: season.color }]}>
-                        {getMovementIcon(session.type)}
-                      </Text>
-                    </View>
-                    <View style={styles.sessionContent}>
-                      <Text style={[styles.sessionLabel, { color: season.text }]}>
-                        {session.label}
-                      </Text>
-                      <Text style={[styles.sessionDetails, { color: season.textSecondary }]}>
-                        {session.feeling} · {getDayLabel(daysAgo)}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </ScrollView>
-
-      </LinearGradient>
-
-      <StoryView
-        visible={showStory}
-        season={season}
-        sessions={sessions}
-        onClose={() => setShowStory(false)}
-      />
-    </View>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutText}>Log out</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </LinearGradient>
   );
 }
 
@@ -194,121 +291,181 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  gradient: {
-    flex: 1,
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.md,
+    backgroundColor: 'rgba(245, 250, 252, 0.97)',
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(61, 122, 138, 0.12)',
   },
+  headerTitle: {
+    ...Typography.headline,
+    color: '#3d7a8a',
+  },
+  userButton: {
+    backgroundColor: '#3d7a8a',
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.pill,
+  },
+  userInitials: {
+    ...Typography.footnote,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  weatherBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  weatherText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#3d7a8a',
+  },
+  // Content
   scrollView: {
     flex: 1,
   },
   content: {
     padding: 24,
   },
-  seasonIndicator: {
+  coachCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(61, 122, 138, 0.15)',
+    shadowColor: '#d4a5a0',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  coachAccentBar: {
+    width: 4,
+    backgroundColor: '#3d7a8a',
+  },
+  coachCardContent: {
+    flex: 1,
+    padding: 18,
     gap: 8,
-    marginBottom: 32,
   },
-  seasonDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  seasonText: {
-    fontSize: 12,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    fontWeight: '500',
-  },
-  prompt: {
-    fontSize: 28,
-    lineHeight: 36,
-    fontWeight: '300',
-    marginBottom: 32,
-    maxWidth: 300,
-  },
-  streakContainer: {
-    marginBottom: 32,
-  },
-  streakLabel: {
-    textAlign: 'center',
+  coachLabel: {
     fontSize: 11,
-    marginTop: 8,
-    opacity: 0.5,
-  },
-  insightCard: {
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 32,
-  },
-  insightWeather: {
-    fontSize: 12,
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  insightText: {
-    fontSize: 14,
-    lineHeight: 21,
-    fontStyle: 'italic',
-  },
-  storyButton: {
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  storyLabel: {
-    fontSize: 11,
-    letterSpacing: 1,
+    letterSpacing: 1.5,
+    fontWeight: '600',
     textTransform: 'uppercase',
-    marginBottom: 4,
+    color: '#3d7a8a',
   },
-  storyTitle: {
+  coachHeadline: {
     fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  coachBody: {
+    fontSize: 15,
+    lineHeight: 22,
     fontWeight: '400',
+    color: Colors.textPrimary,
   },
-  storyArrow: {
-    fontSize: 20,
-    opacity: 0.4,
+  readMore: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#3d7a8a',
+    marginTop: 2,
   },
-  recentSection: {
-    marginTop: 0,
+  coachCaption: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
-  recentLabel: {
-    fontSize: 11,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 12,
+  tellMeMoreRow: {
+    marginTop: 6,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(61, 122, 138, 0.12)',
   },
-  sessionCard: {
+  tellMeMore: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#3d7a8a',
+  },
+  feedbackRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.04)',
+    gap: 16,
+    marginTop: 10,
   },
-  sessionIcon: {
+  coachMessagePlaceholder: {
+    paddingVertical: 4,
+  },
+  placeholderLine: {
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.separator,
+  },
+  // Profile modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.overlay,
+  },
+  modalSheet: {
+    backgroundColor: Colors.cardBackground,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  modalHandle: {
     width: 36,
-    height: 36,
-    borderRadius: 10,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.separator,
+    marginBottom: Spacing.sm,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: BorderRadius.round,
+    backgroundColor: Colors.accentLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sessionIconText: {
-    fontSize: 16,
+  avatarInitials: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: Colors.accent,
   },
-  sessionContent: {
-    flex: 1,
+  email: {
+    ...Typography.subheadline,
+    color: Colors.textSecondary,
   },
-  sessionLabel: {
-    fontSize: 15,
-    fontWeight: '500',
+  divider: {
+    width: '100%',
+    height: 0.5,
+    backgroundColor: Colors.separator,
+    marginVertical: Spacing.xs,
   },
-  sessionDetails: {
-    fontSize: 12,
-    marginTop: 2,
+  logoutButton: {
+    width: '100%',
+    padding: Spacing.base,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    backgroundColor: '#FFF0F0',
+  },
+  logoutText: {
+    ...Typography.headline,
+    color: Colors.destructive,
   },
 });

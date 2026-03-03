@@ -8,9 +8,13 @@ import {
   Animated,
   Platform,
   Keyboard,
+  Modal,
+  ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SeasonTheme, MovementType, FeelingType, WorkoutExercise } from '../types';
 import { MOVEMENT_TYPES, FEELINGS } from '../constants/seasonal';
+import { getCustomTags, addCustomTag, getCustomMovementTypes, addCustomMovementType, ActivityPreference, getActivityPreferences, saveActivityPreferences } from '../services/storage';
 
 const hexToRgba = (hex: string, alpha: number): string => {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -21,23 +25,41 @@ const hexToRgba = (hex: string, alpha: number): string => {
 
 interface QuickLogCardProps {
   season: SeasonTheme;
-  onSave: (entry: { type: MovementType; feeling: FeelingType; note?: string; workoutDetails?: WorkoutExercise[] }) => void;
+  onSave: (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[] }) => void;
 }
+
+type ActivityItem = { id: string; label: string; icon: string };
 
 export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
   const [selectedType, setSelectedType] = useState<MovementType | null>(null);
-  const [selectedFeeling, setSelectedFeeling] = useState<FeelingType | null>(null);
+  const [selectedFeelings, setSelectedFeelings] = useState<FeelingType[]>([]);
   const [note, setNote] = useState('');
   const [showNote, setShowNote] = useState(false);
   const [showWorkoutDetails, setShowWorkoutDetails] = useState(false);
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([
     { name: '', sets: undefined, reps: undefined, weight: undefined }
   ]);
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [showCustomTagInput, setShowCustomTagInput] = useState(false);
+  const [customTagInput, setCustomTagInput] = useState('');
+  const [customMovementTypes, setCustomMovementTypes] = useState<Array<{ id: string; label: string; icon: string }>>([]);
+  const [showCustomMovementInput, setShowCustomMovementInput] = useState(false);
+  const [customMovementInput, setCustomMovementInput] = useState('');
+
+  const [activityPrefs, setActivityPrefs] = useState<ActivityPreference[]>([]);
+  const [customizeVisible, setCustomizeVisible] = useState(false);
+  const [draftPrefs, setDraftPrefs] = useState<ActivityPreference[]>([]);
 
   const feelingOpacity = useRef(new Animated.Value(0)).current;
   const feelingTranslateY = useRef(new Animated.Value(12)).current;
   const saveOpacity = useRef(new Animated.Value(0)).current;
   const saveTranslateY = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    loadCustomTags();
+    loadCustomMovementTypes();
+    loadActivityPrefs();
+  }, []);
 
   useEffect(() => {
     if (selectedType) {
@@ -56,8 +78,23 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
     }
   }, [selectedType]);
 
+  const loadCustomTags = async () => {
+    const tags = await getCustomTags();
+    setCustomTags(tags);
+  };
+
+  const loadCustomMovementTypes = async () => {
+    const types = await getCustomMovementTypes();
+    setCustomMovementTypes(types);
+  };
+
+  const loadActivityPrefs = async () => {
+    const prefs = await getActivityPreferences();
+    setActivityPrefs(prefs);
+  };
+
   useEffect(() => {
-    if (selectedType && selectedFeeling) {
+    if (selectedType) {
       Animated.parallel([
         Animated.timing(saveOpacity, {
           toValue: 1,
@@ -71,14 +108,60 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
         }),
       ]).start();
     }
-  }, [selectedType, selectedFeeling]);
+  }, [selectedType]);
+
+  const getAllTypes = (): ActivityItem[] => [
+    ...MOVEMENT_TYPES,
+    ...customMovementTypes.map(t => ({ ...t })),
+  ];
+
+  const getDisplayedTypes = (): ActivityItem[] => {
+    const allTypes = getAllTypes();
+    if (activityPrefs.length === 0) return allTypes;
+    return activityPrefs
+      .filter(p => p.visible)
+      .map(p => allTypes.find(t => t.id === p.id))
+      .filter((t): t is ActivityItem => Boolean(t));
+  };
+
+  const openCustomize = () => {
+    const allTypes = getAllTypes();
+    const base = activityPrefs.length > 0
+      ? activityPrefs
+      : allTypes.map(t => ({ id: t.id, visible: true }));
+    const missing = allTypes
+      .filter(t => !base.find(p => p.id === t.id))
+      .map(t => ({ id: t.id, visible: true }));
+    setDraftPrefs([...base, ...missing]);
+    setCustomizeVisible(true);
+  };
+
+  const saveCustomize = async () => {
+    await saveActivityPreferences(draftPrefs);
+    setActivityPrefs(draftPrefs);
+    setCustomizeVisible(false);
+  };
+
+  const moveItem = (index: number, direction: -1 | 1) => {
+    const next = index + direction;
+    if (next < 0 || next >= draftPrefs.length) return;
+    setDraftPrefs(prev => {
+      const updated = [...prev];
+      [updated[index], updated[next]] = [updated[next], updated[index]];
+      return updated;
+    });
+  };
 
   const resetState = () => {
     setSelectedType(null);
-    setSelectedFeeling(null);
+    setSelectedFeelings([]);
     setNote('');
     setShowNote(false);
     setShowWorkoutDetails(false);
+    setShowCustomTagInput(false);
+    setCustomTagInput('');
+    setShowCustomMovementInput(false);
+    setCustomMovementInput('');
     setWorkoutExercises([{ name: '', sets: undefined, reps: undefined, weight: undefined }]);
     feelingOpacity.setValue(0);
     feelingTranslateY.setValue(12);
@@ -86,15 +169,25 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
     saveTranslateY.setValue(12);
   };
 
+  const toggleFeeling = (id: FeelingType) => {
+    setSelectedFeelings(prev => {
+      if (prev.includes(id)) return prev.filter(f => f !== id);
+      if (prev.length >= 3) return prev;
+      return [...prev, id];
+    });
+  };
+
   const handleSave = () => {
-    if (selectedType && selectedFeeling) {
+    if (selectedType) {
       const validExercises = showWorkoutDetails
         ? workoutExercises.filter(ex => ex.name.trim() !== '')
         : undefined;
 
+      const typeData = getAllTypes().find(t => t.id === selectedType);
       onSave({
         type: selectedType,
-        feeling: selectedFeeling,
+        label: typeData?.label ?? selectedType,
+        feelings: selectedFeelings,
         note: note || undefined,
         workoutDetails: validExercises && validExercises.length > 0 ? validExercises : undefined,
       });
@@ -102,7 +195,7 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
     }
   };
 
-  const updateExercise = (index: number, field: keyof WorkoutExercise, value: string | number) => {
+  const updateExercise = (index: number, field: keyof WorkoutExercise, value: string | number | undefined) => {
     const updated = [...workoutExercises];
     updated[index] = { ...updated[index], [field]: value };
     setWorkoutExercises(updated);
@@ -118,17 +211,63 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
     }
   };
 
+  const handleAddCustomTag = async () => {
+    const trimmedTag = customTagInput.trim();
+    if (trimmedTag) {
+      await addCustomTag(trimmedTag);
+      await loadCustomTags();
+      toggleFeeling(trimmedTag as FeelingType);
+      setCustomTagInput('');
+      setShowCustomTagInput(false);
+      Keyboard.dismiss();
+    }
+  };
+
+  const handleAddCustomMovementType = async () => {
+    const trimmedLabel = customMovementInput.trim();
+    if (trimmedLabel) {
+      await addCustomMovementType(trimmedLabel);
+      await loadCustomMovementTypes();
+      const id = trimmedLabel.toLowerCase().replace(/\s+/g, '_');
+      setSelectedType(id as MovementType);
+      setCustomMovementInput('');
+      setShowCustomMovementInput(false);
+      Keyboard.dismiss();
+    }
+  };
+
+  const displayedTypes = getDisplayedTypes();
+  const allTypesForModal = getAllTypes();
+
   return (
     <View style={[styles.card, { backgroundColor: season.cardBg }]}>
-      <Text style={[styles.question, { color: season.text }]}>
-        What did you do?
-      </Text>
+      <View style={styles.cardHeader}>
+        <Text style={[styles.cardLabel, { color: season.color }]}>
+          ▸ Log A Session
+        </Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={openCustomize} style={styles.customizeButton} activeOpacity={0.7}>
+            <Ionicons name="options-outline" size={18} color={season.textSecondary} />
+          </TouchableOpacity>
+          {(selectedType || selectedFeelings.length > 0 || note || showWorkoutDetails) && (
+            <TouchableOpacity
+              onPress={resetState}
+              style={styles.clearButton}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.clearButtonText, { color: season.textSecondary }]}>
+                Clear
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
       <View style={styles.optionsContainer}>
-        {MOVEMENT_TYPES.map((type) => (
+        {displayedTypes.map((type) => (
           <TouchableOpacity
             key={type.id}
-            onPress={() => setSelectedType(type.id)}
+            onPress={() => setSelectedType(type.id as MovementType)}
             style={[
               styles.option,
               selectedType === type.id
@@ -150,7 +289,48 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
             </Text>
           </TouchableOpacity>
         ))}
+
+        {/* Add custom movement type button */}
+        {!showCustomMovementInput && (
+          <TouchableOpacity
+            onPress={() => setShowCustomMovementInput(true)}
+            style={[styles.plusButton, { borderColor: hexToRgba(season.color, 0.2) }]}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.plusButtonText, { color: season.color }]}>
+              +
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Custom movement type input */}
+      {showCustomMovementInput && (
+        <View style={[styles.customTagInputContainer, styles.customMovementInputContainer]}>
+          <TextInput
+            value={customMovementInput}
+            onChangeText={setCustomMovementInput}
+            placeholder="Activity name..."
+            placeholderTextColor={hexToRgba(season.textSecondary, 0.5)}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleAddCustomMovementType}
+            onBlur={() => {
+              if (!customMovementInput.trim()) {
+                setShowCustomMovementInput(false);
+              }
+            }}
+            style={[styles.customTagInput, { color: season.text, borderColor: hexToRgba(season.color, 0.2) }]}
+          />
+          <TouchableOpacity
+            onPress={handleAddCustomMovementType}
+            style={[styles.addTagButton, { backgroundColor: season.color }]}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.addTagButtonText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {selectedType && (
         <Animated.View
@@ -159,39 +339,102 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
             transform: [{ translateY: feelingTranslateY }],
           }}
         >
-          <Text style={[styles.question, { color: season.text, marginTop: 8 }]}>
-            How did it feel?
-          </Text>
-
-          <View style={styles.optionsContainer}>
-            {FEELINGS.map((f) => (
-              <TouchableOpacity
-                key={f.id}
-                onPress={() => setSelectedFeeling(f.id)}
-                style={[
-                  styles.option,
-                  selectedFeeling === f.id
-                    ? {
-                        borderColor: season.color,
-                        backgroundColor: hexToRgba(season.color, 0.1),
-                      }
-                    : styles.optionInactive,
-                ]}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    { color: selectedFeeling === f.id ? season.color : season.textSecondary },
-                  ]}
-                >
-                  {f.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.feelingHeader}>
+            <Text style={[styles.cardLabel, { color: season.color }]}>
+              How did it feel?
+            </Text>
+            <Text style={[styles.feelingCount, { color: season.textSecondary }]}>
+              {selectedFeelings.length > 0 ? `${selectedFeelings.length}/3` : 'optional'}
+            </Text>
           </View>
 
-          {selectedType === 'lifted' && !showWorkoutDetails && (
+          <View style={styles.optionsContainer}>
+            {/* Default feelings */}
+            {FEELINGS.map((f) => {
+              const isSelected = selectedFeelings.includes(f.id);
+              const isDisabled = !isSelected && selectedFeelings.length >= 3;
+              return (
+                <TouchableOpacity
+                  key={f.id}
+                  onPress={() => toggleFeeling(f.id)}
+                  style={[
+                    styles.option,
+                    isSelected
+                      ? { borderColor: season.color, backgroundColor: hexToRgba(season.color, 0.1) }
+                      : styles.optionInactive,
+                    isDisabled && styles.optionDisabled,
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.optionText, { color: isSelected ? season.color : season.textSecondary, opacity: isDisabled ? 0.35 : 1 }]}>
+                    {f.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Custom tags */}
+            {customTags.map((tag) => {
+              const isSelected = selectedFeelings.includes(tag as FeelingType);
+              const isDisabled = !isSelected && selectedFeelings.length >= 3;
+              return (
+                <TouchableOpacity
+                  key={tag}
+                  onPress={() => toggleFeeling(tag as FeelingType)}
+                  style={[
+                    styles.option,
+                    isSelected
+                      ? { borderColor: season.color, backgroundColor: hexToRgba(season.color, 0.1) }
+                      : styles.optionInactive,
+                    isDisabled && styles.optionDisabled,
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.optionText, { color: isSelected ? season.color : season.textSecondary, opacity: isDisabled ? 0.35 : 1 }]}>
+                    {tag}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Add custom tag button */}
+            {!showCustomTagInput && (
+              <TouchableOpacity
+                onPress={() => setShowCustomTagInput(true)}
+                style={[styles.option, styles.addCustomOption]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.optionText, { color: season.textSecondary, opacity: 0.6 }]}>
+                  + Custom
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Custom tag input */}
+          {showCustomTagInput && (
+            <View style={styles.customTagInputContainer}>
+              <TextInput
+                value={customTagInput}
+                onChangeText={setCustomTagInput}
+                placeholder="Type your feeling..."
+                placeholderTextColor={hexToRgba(season.textSecondary, 0.5)}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleAddCustomTag}
+                style={[styles.customTagInput, { color: season.text, borderColor: hexToRgba(season.color, 0.2) }]}
+              />
+              <TouchableOpacity
+                onPress={handleAddCustomTag}
+                style={[styles.addTagButton, { backgroundColor: season.color }]}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.addTagButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {selectedType === 'strength_training' && !showWorkoutDetails && (
             <TouchableOpacity
               onPress={() => setShowWorkoutDetails(true)}
               style={styles.addNoteButton}
@@ -203,7 +446,7 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
             </TouchableOpacity>
           )}
 
-          {selectedType === 'lifted' && showWorkoutDetails && (
+          {selectedType === 'strength_training' && showWorkoutDetails && (
             <View style={styles.workoutSection}>
               {workoutExercises.map((exercise, index) => (
                 <View key={index} style={styles.exerciseRow}>
@@ -291,13 +534,13 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
         </Animated.View>
       )}
 
-      {selectedType && selectedFeeling && (
+      {selectedType && (
         <Animated.View
           style={{
             opacity: saveOpacity,
             transform: [{ translateY: saveTranslateY }],
           }}
-          pointerEvents={selectedType && selectedFeeling ? 'auto' : 'none'}
+          pointerEvents={selectedType ? 'auto' : 'none'}
         >
           <TouchableOpacity
             onPress={handleSave}
@@ -308,6 +551,64 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
           </TouchableOpacity>
         </Animated.View>
       )}
+
+      {/* Customize Modal */}
+      <Modal visible={customizeVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} onPress={() => setCustomizeVisible(false)} />
+          <View style={[styles.customizeSheet, { backgroundColor: '#fff' }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.customizeHeader}>
+              <Text style={[styles.customizeTitle, { color: season.text }]}>Customize Activities</Text>
+              <TouchableOpacity onPress={saveCustomize}>
+                <Text style={[styles.customizeDone, { color: season.color }]}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.customizeHint, { color: season.textSecondary }]}>Use arrows to reorder</Text>
+
+            <ScrollView>
+              {draftPrefs.map((p, index) => {
+                const found = allTypesForModal.find(t => t.id === p.id);
+                const label = found?.label ?? p.id;
+                const icon = found?.icon ?? '•';
+                return (
+                  <View key={p.id} style={styles.customizeRow}>
+                    <View style={styles.reorderButtons}>
+                      <TouchableOpacity
+                        onPress={() => moveItem(index, -1)}
+                        style={[styles.reorderBtn, index === 0 && styles.reorderBtnDisabled]}
+                        disabled={index === 0}
+                      >
+                        <Ionicons name="chevron-up" size={16} color={index === 0 ? 'transparent' : season.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => moveItem(index, 1)}
+                        style={[styles.reorderBtn, index === draftPrefs.length - 1 && styles.reorderBtnDisabled]}
+                        disabled={index === draftPrefs.length - 1}
+                      >
+                        <Ionicons name="chevron-down" size={16} color={index === draftPrefs.length - 1 ? 'transparent' : season.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.customizeIcon}>{icon}</Text>
+                    <Text style={[styles.customizeLabel, { color: season.text }]}>{label}</Text>
+                    <TouchableOpacity
+                      onPress={() =>
+                        setDraftPrefs(prev =>
+                          prev.map(item => item.id === p.id ? { ...item, visible: !item.visible } : item)
+                        )
+                      }
+                      activeOpacity={0.7}
+                      style={[styles.toggleButton, { borderColor: p.visible ? season.color : 'rgba(0,0,0,0.15)', backgroundColor: p.visible ? season.color : 'transparent' }]}
+                    >
+                      {p.visible && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -317,12 +618,49 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 28,
+    shadowColor: '#d4a5a0',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cardLabel: {
+    fontSize: 11,
+    letterSpacing: 1.5,
+    fontWeight: '600',
+    fontFamily: 'Nunito_600SemiBold',
+    textTransform: 'uppercase',
+    flex: 1,
   },
   question: {
     fontSize: 22,
     fontWeight: '400',
-    marginBottom: 16,
+    flex: 1,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  clearButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  clearButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.6,
+  },
+  customizeButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
   optionsContainer: {
     flexDirection: 'row',
@@ -337,7 +675,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   optionInactive: {
-    borderColor: 'rgba(0,0,0,0.08)',
+    borderColor: '#e8d5d0',
     backgroundColor: 'transparent',
   },
   optionText: {
@@ -419,5 +757,142 @@ const styles = StyleSheet.create({
   },
   addExerciseButton: {
     marginTop: 8,
+  },
+  addCustomOption: {
+    borderStyle: 'dashed',
+  },
+  customTagInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  customMovementInputContainer: {
+    marginTop: -16,
+  },
+  customTagInput: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 14,
+  },
+  addTagButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  addTagButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  plusButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 52,
+  },
+  plusButtonText: {
+    fontSize: 20,
+    fontWeight: '400',
+    lineHeight: 20,
+  },
+  feelingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  feelingCount: {
+    fontSize: 13,
+    fontWeight: '500',
+    opacity: 0.6,
+  },
+  optionDisabled: {
+    opacity: 0.35,
+  },
+  // Customize modal styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  customizeSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+    paddingBottom: 40,
+    maxHeight: '70%',
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  customizeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 4,
+  },
+  customizeTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  customizeDone: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  customizeHint: {
+    fontSize: 13,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    opacity: 0.6,
+  },
+  customizeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  reorderButtons: {
+    flexDirection: 'column',
+    gap: 2,
+  },
+  reorderBtn: {
+    padding: 2,
+  },
+  reorderBtnDisabled: {
+    opacity: 0,
+  },
+  customizeIcon: {
+    fontSize: 18,
+    width: 28,
+    textAlign: 'center',
+  },
+  customizeLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  toggleButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

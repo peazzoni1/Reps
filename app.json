@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Reps",
-    "slug": "Reps",
+    "name": "Blue Fitness",
+    "slug": "blue-fitness",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,10 +12,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "scheme": "blue-fitness",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.bluefitness.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Reps uses your location to show local weather conditions in your greeting."
+        "NSLocationWhenInUseUsageDescription": "Blue Fitness uses your location to show local weather conditions in your greeting.",
+        "NSFaceIDUsageDescription": "Blue Fitness uses Face ID to securely sign you in."
       }
     },
     "android": {
@@ -32,6 +35,13 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-web-browser",
+      "expo-apple-authentication",
+      "expo-secure-store",
+      "expo-local-authentication",
+      "expo-font"
+    ]
   }
 }

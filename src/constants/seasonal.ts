@@ -46,26 +46,28 @@ export const SEASONS: Record<SeasonType, SeasonTheme> = {
   winter: {
     name: 'Winter',
     theme: 'Rest',
-    color: '#5a6d7a',
-    accent: '#8fa3b0',
+    color: '#1A5276',
+    accent: '#5BA4CF',
     bgStart: '#f2f4f6',
     bgMiddle: '#e4e8ec',
     bgEnd: '#d6dce2',
     cardBg: 'rgba(255,255,255,0.55)',
-    text: '#2a3540',
-    textSecondary: '#5e7080',
-    prompt: 'Gentle movement is still movement.',
+    text: '#1a3445',
+    textSecondary: '#4a6d85',
+    prompt: '',
     philosophy: 'A season for rest, recovery, and quiet strength.',
   },
 };
 
 export const MOVEMENT_TYPES: Array<{ id: MovementType; label: string; icon: string }> = [
-  { id: 'lifted', label: 'Lifted', icon: '◆' },
-  { id: 'walked', label: 'Walked', icon: '↗' },
-  { id: 'ran', label: 'Ran', icon: '»' },
-  { id: 'stretched', label: 'Stretched', icon: '~' },
-  { id: 'played', label: 'Played', icon: '○' },
-  { id: 'moved', label: 'Moved', icon: '∿' },
+  { id: 'strength_training', label: 'Strength Training', icon: '◆' },
+  { id: 'walking', label: 'Walking', icon: '↗' },
+  { id: 'running', label: 'Running', icon: '»' },
+  { id: 'stretching', label: 'Stretching', icon: '~' },
+  { id: 'sports_and_play', label: 'Sports & Play', icon: '○' },
+  { id: 'cycling', label: 'Cycling', icon: '⟳' },
+  { id: 'yoga', label: 'Yoga', icon: '⌘' },
+  { id: 'other', label: 'Other', icon: '∿' },
 ];
 
 export const FEELINGS: Array<{ id: FeelingType; label: string }> = [
@@ -76,7 +78,78 @@ export const FEELINGS: Array<{ id: FeelingType; label: string }> = [
   { id: 'grinding', label: 'Grinding' },
   { id: 'easy', label: 'Easy' },
   { id: 'rough', label: 'Rough' },
+  { id: 'tired', label: 'Tired' },
 ];
+
+// ─── Season blending ─────────────────────────────────────────────────────────
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b]
+    .map(v => Math.round(v).toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function lerpColor(hexA: string, hexB: string, t: number): string {
+  const [r1, g1, b1] = hexToRgb(hexA);
+  const [r2, g2, b2] = hexToRgb(hexB);
+  return rgbToHex(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t);
+}
+
+function lerpCardBg(a: string, b: string, t: number): string {
+  const alphaA = parseFloat(a.match(/[\d.]+(?=\))/)?.[0] ?? '0.6');
+  const alphaB = parseFloat(b.match(/[\d.]+(?=\))/)?.[0] ?? '0.6');
+  const alpha = alphaA + (alphaB - alphaA) * t;
+  return `rgba(255,255,255,${alpha.toFixed(2)})`;
+}
+
+/**
+ * Returns the current season's theme, gradually blending toward the next
+ * season's palette in the final 40% of the season (up to 45% blend max).
+ * This gives a subtle "transitional" feel as the season comes to a close.
+ */
+export function getBlendedTheme(): SeasonTheme {
+  const currentSeasonType = getCurrentSeason();
+  const { currentDay, totalDays } = getSeasonDay();
+  const progress = currentDay / totalDays;
+
+  const BLEND_START = 0.60; // start mixing at 60% through the season
+  const MAX_BLEND = 0.45;   // never fully become the next season
+
+  let t = 0;
+  if (progress > BLEND_START) {
+    t = ((progress - BLEND_START) / (1 - BLEND_START)) * MAX_BLEND;
+  }
+
+  const current = SEASONS[currentSeasonType];
+  if (t === 0) return current;
+
+  const seasonOrder: SeasonType[] = ['spring', 'summer', 'autumn', 'winter'];
+  const nextSeasonType = seasonOrder[(seasonOrder.indexOf(currentSeasonType) + 1) % 4];
+  const next = SEASONS[nextSeasonType];
+
+  return {
+    name: current.name,
+    theme: current.theme,
+    prompt: current.prompt,
+    philosophy: current.philosophy,
+    color:         lerpColor(current.color, next.color, t),
+    accent:        lerpColor(current.accent, next.accent, t),
+    bgStart:       lerpColor(current.bgStart, next.bgStart, t),
+    bgMiddle:      lerpColor(current.bgMiddle, next.bgMiddle, t),
+    bgEnd:         lerpColor(current.bgEnd, next.bgEnd, t),
+    cardBg:        lerpCardBg(current.cardBg, next.cardBg, t),
+    text:          lerpColor(current.text, next.text, t),
+    textSecondary: lerpColor(current.textSecondary, next.textSecondary, t),
+  };
+}
 
 export function getCurrentSeason(): SeasonType {
   const month = new Date().getMonth();

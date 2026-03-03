@@ -46,7 +46,7 @@ const SEASONS = {
     cardBg: "rgba(255,255,255,0.55)",
     text: "#2a3540",
     textSecondary: "#5e7080",
-    prompt: "Gentle movement is still movement.",
+    prompt: "",
     philosophy: "A season for rest, recovery, and quiet strength.",
   },
 };
@@ -296,7 +296,7 @@ function QuickLog({ season, onClose, onSave }) {
         />
 
         <div style={{ fontFamily: "'Newsreader', Georgia, serif", fontSize: 22, color: s.text, marginBottom: 24 }}>
-          What did you do?
+          What did you do today?
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 32 }}>

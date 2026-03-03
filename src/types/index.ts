@@ -1,32 +1,7 @@
-export interface Exercise {
-  name: string;
-}
-
-export interface Template {
-  id: string;
-  name: string;
-  exercises: Exercise[];
-}
-
-export interface ExerciseInstance {
-  name: string;
-  weight?: number;
-  reps?: number;
-  sets?: number;
-  tags?: string[];
-  notes?: string;
-}
-
-export interface WorkoutInstance {
-  id: string;
-  templateId: string;
-  date: string;
-  exercises: ExerciseInstance[];
-}
-
-export type MovementType = 'lifted' | 'walked' | 'ran' | 'stretched' | 'played' | 'moved';
-export type FeelingType = 'strong' | 'alive' | 'peaceful' | 'heavy' | 'grinding' | 'easy' | 'rough';
+export type MovementType = 'strength_training' | 'walking' | 'running' | 'stretching' | 'sports_and_play' | 'other' | 'cycling' | 'yoga';
+export type FeelingType = 'strong' | 'alive' | 'peaceful' | 'heavy' | 'grinding' | 'easy' | 'rough' | 'tired';
 export type SeasonType = 'spring' | 'summer' | 'autumn' | 'winter';
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export interface WorkoutExercise {
   name: string;
@@ -38,7 +13,7 @@ export interface WorkoutExercise {
 export interface MovementSession {
   id: string;
   type: MovementType;
-  feeling: FeelingType;
+  feelings: FeelingType[];
   label: string;
   date: string;
   note?: string;
@@ -58,4 +33,39 @@ export interface SeasonTheme {
   textSecondary: string;
   prompt: string;
   philosophy: string;
+}
+
+export interface FoodEntry {
+  id: string;
+  date: string;
+  description: string;
+  meal?: MealType;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export type MemoryType = 'persistent' | 'contextual';
+
+export interface MemoryBullet {
+  text: string;
+  memoryType: MemoryType;
+}
+
+export interface CoachSession {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  messages: ChatMessage[];
+  memorySummary: MemoryBullet[] | null;
+}
+
+export interface DailySnapshot {
+  date: string; // YYYY-MM-DD
+  exercises: MovementSession[];
+  food: FoodEntry[];
 }

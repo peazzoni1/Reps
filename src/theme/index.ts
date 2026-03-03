@@ -10,8 +10,8 @@ export const Colors = {
   textTertiary: '#C7C7CC',
 
   // Accent & Interactive
-  accent: '#007AFF',
-  accentLight: '#E3F2FD',
+  accent: '#1A5276',
+  accentLight: 'rgba(26, 82, 118, 0.08)',
 
   // Semantic
   success: '#34C759',
