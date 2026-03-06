@@ -68,6 +68,7 @@ export const MOVEMENT_TYPES: Array<{ id: MovementType; label: string; icon: stri
   { id: 'cycling', label: 'Cycling', icon: '⟳' },
   { id: 'yoga', label: 'Yoga', icon: '⌘' },
   { id: 'other', label: 'Other', icon: '∿' },
+  { id: 'rest_day', label: 'Rest Day', icon: '—' },
 ];
 
 export const FEELINGS: Array<{ id: FeelingType; label: string }> = [

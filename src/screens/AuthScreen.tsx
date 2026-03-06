@@ -11,12 +11,12 @@ import {
   Alert,
   Animated,
   Easing,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Crypto from 'expo-crypto';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -117,6 +117,110 @@ function AnimatedGradientBackground({ children }: { children: React.ReactNode })
   );
 }
 
+function PrivacyPolicyModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[ppStyles.container, { paddingTop: insets.top || 20 }]}>
+        <View style={ppStyles.header}>
+          <Text style={ppStyles.title}>Privacy Policy</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={ppStyles.scroll} contentContainerStyle={ppStyles.scrollContent} showsVerticalScrollIndicator={false}>
+          <Text style={ppStyles.updated}>Last updated: March 2026</Text>
+
+          <Text style={ppStyles.section}>What we collect</Text>
+          <Text style={ppStyles.body}>
+            When you create an account, we store your email address. As you use the app, we store the
+            activity and food logs you create, and the conversations you have with the AI coach.
+          </Text>
+
+          <Text style={ppStyles.section}>How your data is stored</Text>
+          <Text style={ppStyles.body}>
+            Your data is stored in Supabase, a cloud database provider. It is encrypted at rest.
+            Access controls ensure that other users cannot read your data.{'\n\n'}
+            As the developer of this app, I have administrative access to the database and can
+            technically read your data. I will never do this except to diagnose a bug you report,
+            and only with your explicit permission.
+          </Text>
+
+          <Text style={ppStyles.section}>AI coach conversations</Text>
+          <Text style={ppStyles.body}>
+            The AI coach is powered by Anthropic's Claude API. When you send a message, the
+            conversation is transmitted to Anthropic's servers to generate a response. Anthropic's
+            privacy policy applies to that data. We do not use your conversations to train AI models.
+          </Text>
+
+          <Text style={ppStyles.section}>What we don't do</Text>
+          <Text style={ppStyles.body}>
+            We do not sell your data. We do not share your data with advertisers or third parties
+            beyond the infrastructure providers listed above (Supabase, Anthropic).
+          </Text>
+
+          <Text style={ppStyles.section}>Deleting your data</Text>
+          <Text style={ppStyles.body}>
+            You can delete your account and all associated data at any time from the app settings.
+            Once deleted, your data is permanently removed from our servers within 30 days.
+          </Text>
+
+          <Text style={ppStyles.section}>Contact</Text>
+          <Text style={ppStyles.body}>
+            Questions? Reach out via the feedback option in settings.
+          </Text>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+const ppStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e0e0e0',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+    paddingTop: 20,
+  },
+  updated: {
+    fontSize: 13,
+    color: '#999',
+    marginBottom: 24,
+  },
+  section: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111',
+    marginTop: 20,
+    marginBottom: 6,
+  },
+  body: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#444',
+  },
+});
+
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -124,22 +228,20 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
-  const [appleAvailable, setAppleAvailable] = useState(false);
+  const [privacyVisible, setPrivacyVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
   const [fontsLoaded] = useFonts({ Nunito_200ExtraLight, Nunito_300Light });
 
   useEffect(() => {
     (async () => {
-      const [hasHardware, isEnrolled, stored, appleIsAvailable] = await Promise.all([
+      const [hasHardware, isEnrolled, stored] = await Promise.all([
         LocalAuthentication.hasHardwareAsync(),
         LocalAuthentication.isEnrolledAsync(),
         SecureStore.getItemAsync(CREDENTIALS_KEY),
-        AppleAuthentication.isAvailableAsync().catch(() => false),
       ]);
       setHasBiometrics(hasHardware && isEnrolled);
       setHasSavedCredentials(!!stored);
-      setAppleAvailable(!!appleIsAvailable);
     })();
   }, []);
 
@@ -192,65 +294,33 @@ export default function AuthScreen() {
     setLoading(false);
   };
 
-  const handleAppleSignIn = async () => {
-    setLoading(true);
-    try {
-      // Generate a random nonce and hash it — Supabase requires the raw nonce
-      // to verify the hashed nonce Apple embeds in the identity token.
-      const rawNonce = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-      const hashedNonce = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        rawNonce
-      );
-
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-        nonce: hashedNonce,
-      });
-
-      if (!credential.identityToken) {
-        Alert.alert('Apple Sign In failed', 'No identity token returned.');
-        return;
-      }
-
-      const { error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken,
-        nonce: rawNonce,
-      });
-
-      if (error) {
-        Alert.alert('Apple Sign In failed', error.message);
-      }
-    } catch (e: any) {
-      if (e?.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Apple Sign In failed', e?.message ?? 'Something went wrong.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const wordmarkFont = fontsLoaded ? 'Nunito_200ExtraLight' : undefined;
 
   return (
     <AnimatedGradientBackground>
+      <PrivacyPolicyModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
-        <View style={[styles.inner, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 32 }]}>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[styles.inner, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 32 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
 
-          {/* Logo mark + wordmark */}
-          <ArcLogo />
-          <Text style={[styles.wordmark, wordmarkFont ? { fontFamily: wordmarkFont } : null]}>
-            Blue Fitness
-          </Text>
-          <Text style={styles.tagline}>Log your movement. Track how you feel. Keep showing up.</Text>
+          {/* Brand block */}
+          <View>
+            <ArcLogo />
+            <Text style={[styles.wordmark, wordmarkFont ? { fontFamily: wordmarkFont } : null]}>
+              Blue Fitness
+            </Text>
+            <Text style={styles.tagline}>Log your movement. Track how you feel. Keep showing up.</Text>
+          </View>
 
+          {/* Form block */}
           <View style={styles.form}>
             <TextInput
               style={styles.input}
@@ -300,37 +370,36 @@ export default function AuthScreen() {
               </Text>
             </TouchableOpacity>
 
-            {Platform.OS === 'ios' && appleAvailable && (
-              <>
-                <View style={styles.dividerRow}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>or</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-                <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
-                  cornerRadius={BorderRadius.lg}
-                  style={styles.appleButton}
-                  onPress={handleAppleSignIn}
-                />
-              </>
+            {mode === 'signup' && (
+              <Text style={styles.privacyText}>
+                By creating an account, you agree to our{' '}
+                <Text style={styles.privacyLink} onPress={() => setPrivacyVisible(true)}>
+                  Privacy Policy
+                </Text>
+                .
+              </Text>
+            )}
+
+            {mode === 'signin' && (
+              <TouchableOpacity onPress={() => setPrivacyVisible(true)} activeOpacity={0.7} style={styles.privacyRow}>
+                <Text style={styles.privacyLink}>Privacy Policy</Text>
+              </TouchableOpacity>
+            )}
+
+
+            {mode === 'signin' && hasBiometrics && (
+              <TouchableOpacity
+                onPress={handleFaceId}
+                disabled={loading}
+                activeOpacity={0.7}
+                style={styles.faceIdRow}
+              >
+                <Ionicons name="scan-outline" size={30} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.faceIdText}>Face ID</Text>
+              </TouchableOpacity>
             )}
           </View>
-
-          {/* Face ID — pinned at bottom */}
-          {mode === 'signin' && hasBiometrics && (
-            <TouchableOpacity
-              onPress={handleFaceId}
-              disabled={loading}
-              activeOpacity={0.7}
-              style={styles.faceIdRow}
-            >
-              <Ionicons name="scan-outline" size={30} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.faceIdText}>Face ID</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </AnimatedGradientBackground>
   );
@@ -341,7 +410,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inner: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: Spacing.xl,
     justifyContent: 'space-between',
   },
@@ -406,7 +475,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    marginTop: 40,
+    paddingVertical: Spacing.base,
   },
   faceIdText: {
     color: 'rgba(255,255,255,0.8)',
@@ -426,24 +495,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginVertical: Spacing.xs,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  dividerText: {
+  privacyText: {
     ...Typography.footnote,
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 0.5,
+    color: 'rgba(255,255,255,0.65)',
+    textAlign: 'center',
+    lineHeight: 18,
   },
-  appleButton: {
-    height: 52,
-    width: '100%',
+  privacyLink: {
+    color: 'rgba(255,255,255,0.9)',
+    textDecorationLine: 'underline',
+  },
+  privacyRow: {
+    alignItems: 'center',
   },
 });

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Blue Fitness",
     "slug": "blue-fitness",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,11 +14,13 @@
     },
     "scheme": "blue-fitness",
     "ios": {
+      "buildNumber": "3",
       "supportsTablet": true,
       "bundleIdentifier": "com.bluefitness.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Blue Fitness uses your location to show local weather conditions in your greeting.",
-        "NSFaceIDUsageDescription": "Blue Fitness uses Face ID to securely sign you in."
+        "NSFaceIDUsageDescription": "Blue Fitness uses Face ID to securely sign you in.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -30,7 +32,9 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "web": {
@@ -42,6 +46,11 @@
       "expo-secure-store",
       "expo-local-authentication",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4b255837-27d5-4845-bafb-8edbe4fba9d2"
+      }
+    }
   }
 }

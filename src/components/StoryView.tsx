@@ -35,7 +35,7 @@ export default function StoryView({ visible, season, sessions, onClose }: StoryV
   // Most common feeling
   const feelingCounts: Record<string, number> = {};
   sessions.forEach((s) => {
-    feelingCounts[s.feeling] = (feelingCounts[s.feeling] || 0) + 1;
+    (s.feelings ?? []).forEach((f) => { feelingCounts[f] = (feelingCounts[f] || 0) + 1; });
   });
   const mostCommonFeeling = Object.entries(feelingCounts).sort((a, b) => b[1] - a[1])[0];
 

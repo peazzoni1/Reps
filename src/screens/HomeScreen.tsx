@@ -22,6 +22,8 @@ import {
   getCachedDailyMessage,
   storeDailyMessage,
   getPreviousDailyMessages,
+  clearTodayDailyMessage,
+  clearAllData,
   toLocalDateStr,
   DailyCheckInMessage,
 } from '../services/storage';
@@ -85,37 +87,55 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  useFocusEffect(useCallback(() => {
-    let cancelled = false;
-    const loadMessage = async () => {
-      const [cached, recentData, previousMessages] = await Promise.all([
-        getCachedDailyMessage(),
-        getRecentDailySnapshots(5),
-        getPreviousDailyMessages(),
-      ]);
-      const count = recentData.reduce((sum, d) => sum + d.exercises.length, 0);
-      if (!cancelled) setSessionCount(count);
-      if (cached) {
-        if (!cancelled) { setCoachMessage(cached); setCoachLoading(false); }
-        return;
+  // Incrementing key used to discard stale in-flight responses
+  const loadKeyRef = React.useRef(0);
+
+  const loadCoachMessage = useCallback(async (bustCache = false) => {
+    const key = ++loadKeyRef.current;
+
+    if (bustCache) {
+      await clearTodayDailyMessage();
+      setCoachLoading(true);
+      setCoachMessage(null);
+    }
+
+    const [cached, recentData, previousMessages] = await Promise.all([
+      getCachedDailyMessage(),
+      getRecentDailySnapshots(10),
+      getPreviousDailyMessages(),
+    ]);
+
+    if (key !== loadKeyRef.current) return;
+
+    const count = recentData.reduce((sum, d) => sum + d.exercises.length, 0);
+    setSessionCount(count);
+
+    if (cached) {
+      setCoachMessage(cached);
+      setCoachLoading(false);
+      return;
+    }
+
+    setCoachLoading(true);
+    try {
+      const message = await getDailyCheckIn(recentData, previousMessages);
+      if (key !== loadKeyRef.current) return;
+      if (message) {
+        const entry: DailyCheckInMessage = {
+          date: toLocalDateStr(new Date()),
+          headline: message.headline,
+          body: message.body,
+        };
+        await storeDailyMessage(entry);
+        setCoachMessage(entry);
       }
-      try {
-        const message = await getDailyCheckIn(recentData, previousMessages);
-        if (!cancelled && message) {
-          const entry: DailyCheckInMessage = {
-            date: toLocalDateStr(new Date()),
-            headline: message.headline,
-            body: message.body,
-          };
-          await storeDailyMessage(entry);
-          setCoachMessage(entry);
-        }
-      } catch {}
-      if (!cancelled) setCoachLoading(false);
-    };
-    loadMessage();
-    return () => { cancelled = true; };
-  }, []));
+    } catch {}
+    if (key === loadKeyRef.current) setCoachLoading(false);
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    loadCoachMessage();
+  }, [loadCoachMessage]));
 
   const handleTellMeMore = () => {
     if (coachMessage) {
@@ -133,6 +153,7 @@ export default function HomeScreen() {
       entry.note,
       entry.workoutDetails
     );
+    loadCoachMessage(true);
   };
 
   const handleLogout = async () => {
@@ -147,6 +168,45 @@ export default function HomeScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account',
+      'This will permanently delete all your movement logs, food entries, and coach conversations. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you sure?',
+              'Your account and all data will be gone forever.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, delete everything',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setProfileVisible(false);
+                    try {
+                      const { error } = await supabase.functions.invoke('delete-account');
+                      if (error) throw error;
+                    } catch (e) {
+                      Alert.alert('Something went wrong', 'Your account could not be deleted. Please try again.');
+                      return;
+                    }
+                    await clearAllData();
+                    await supabase.auth.signOut();
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   const initials = userEmail ? userEmail[0].toUpperCase() : '?';
@@ -250,7 +310,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Quick log card */}
-        <QuickLogCard season={{ ...season, color: '#3d7a8a', accent: '#7ab8c8', cardBg: '#fffaf8' }} onSave={handleSave} />
+        <QuickLogCard season={{ ...season, color: '#3d7a8a', accent: '#7ab8c8', cardBg: '#fffaf8', textSecondary: '#7a9aaa' }} onSave={handleSave} />
 
       </ScrollView>
 
@@ -279,6 +339,10 @@ export default function HomeScreen() {
 
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <Text style={styles.logoutText}>Log out</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
+              <Text style={styles.deleteText}>Delete account & data</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -467,5 +531,15 @@ const styles = StyleSheet.create({
   logoutText: {
     ...Typography.headline,
     color: Colors.destructive,
+  },
+  deleteButton: {
+    width: '100%',
+    padding: Spacing.base,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+  },
+  deleteText: {
+    ...Typography.subheadline,
+    color: Colors.textTertiary,
   },
 });

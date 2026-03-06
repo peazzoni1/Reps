@@ -213,7 +213,7 @@ export const toLocalDateStr = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-export const getRecentDailySnapshots = async (days: number = 5): Promise<DailySnapshot[]> => {
+export const getRecentDailySnapshots = async (days: number = 10): Promise<DailySnapshot[]> => {
   const [sessions, foodEntries] = await Promise.all([
     getAllMovementSessions(),
     getAllFoodEntries(),
@@ -268,6 +268,17 @@ export const storeDailyMessage = async (msg: DailyCheckInMessage): Promise<void>
     filtered.push(msg);
     const trimmed = filtered.sort((a, b) => a.date.localeCompare(b.date)).slice(-4);
     await AsyncStorage.setItem(DAILY_MESSAGES_HISTORY_KEY, JSON.stringify(trimmed));
+  } catch {}
+};
+
+export const clearTodayDailyMessage = async (): Promise<void> => {
+  try {
+    const raw = await AsyncStorage.getItem(DAILY_MESSAGES_HISTORY_KEY);
+    if (!raw) return;
+    const history: DailyCheckInMessage[] = JSON.parse(raw);
+    const today = toLocalDateStr(new Date());
+    const filtered = history.filter((m) => m.date !== today);
+    await AsyncStorage.setItem(DAILY_MESSAGES_HISTORY_KEY, JSON.stringify(filtered));
   } catch {}
 };
 
@@ -374,6 +385,31 @@ export const getSessionMemorySummaries = async (): Promise<
       date: toLocalDateStr(new Date(s.startedAt)),
       bullets: s.memorySummary as MemoryBullet[],
     }));
+};
+
+// Daily coach usage tracking (client-side, keyed by date so it resets automatically)
+const DAILY_COACH_USAGE_PREFIX = '@coach_daily_usage_';
+
+export const getDailyCoachMessageCount = async (): Promise<number> => {
+  const key = `${DAILY_COACH_USAGE_PREFIX}${toLocalDateStr(new Date())}`;
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? parseInt(raw, 10) : 0;
+  } catch {
+    return 0;
+  }
+};
+
+export const incrementDailyCoachMessageCount = async (): Promise<number> => {
+  const key = `${DAILY_COACH_USAGE_PREFIX}${toLocalDateStr(new Date())}`;
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    const next = (raw ? parseInt(raw, 10) : 0) + 1;
+    await AsyncStorage.setItem(key, String(next));
+    return next;
+  } catch {
+    return 0;
+  }
 };
 
 // Utility: clear all data

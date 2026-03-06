@@ -24,6 +24,7 @@ import {
   deleteMovementSession,
   deleteFoodEntry,
   getCustomMovementTypes,
+  clearTodayDailyMessage,
 } from '../services/storage';
 import { getMovementIcon, MOVEMENT_TYPES, FEELINGS } from '../constants/seasonal';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme';
@@ -91,7 +92,7 @@ export default function TrackingScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     const [data, customTypes] = await Promise.all([
-      getRecentDailySnapshots(5),
+      getRecentDailySnapshots(10),
       getCustomMovementTypes(),
     ]);
     setSnapshots(data);
@@ -118,6 +119,7 @@ export default function TrackingScreen() {
     } else {
       await createFoodEntry(desc, selectedMeal ?? undefined, selectedDate);
     }
+    clearTodayDailyMessage();
     setSaving(false);
     setModalVisible(false);
     load();
@@ -144,6 +146,7 @@ export default function TrackingScreen() {
       editNote.trim() || undefined,
       selectedDate,
     );
+    clearTodayDailyMessage();
     setSavingExercise(false);
     setExerciseModalVisible(false);
     load();
@@ -178,8 +181,12 @@ export default function TrackingScreen() {
       onPress={() => openExerciseModal(session)}
       activeOpacity={0.7}
     >
-      <View style={styles.logIconWrap}>
-        <Text style={styles.logIcon}>{getMovementIcon(session.type)}</Text>
+      <View style={[styles.logIconWrap, session.type === 'rest_day' && styles.restIconWrap]}>
+        <Ionicons
+          name={session.type === 'rest_day' ? 'moon-outline' : 'pulse-outline'}
+          size={18}
+          color={session.type === 'rest_day' ? '#8a7aaa' : Colors.accent}
+        />
       </View>
       <View style={styles.logBody}>
         <Text style={styles.logTitle}>{session.label}</Text>
@@ -557,6 +564,9 @@ const styles = StyleSheet.create({
   },
   foodIconWrap: {
     backgroundColor: '#FFF3E0',
+  },
+  restIconWrap: {
+    backgroundColor: '#ede8f5',
   },
   logIcon: {
     fontSize: 16,

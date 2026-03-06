@@ -24,12 +24,15 @@ import {
   closeCoachSession,
   getArchivedCoachSessions,
   getSessionMemorySummaries,
+  getDailyCoachMessageCount,
+  incrementDailyCoachMessageCount,
 } from '../services/storage';
 import { sendChatMessage, generateSessionSummary } from '../services/anthropic';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme';
 import { TabParamList } from '../navigation/TabNavigator';
 
 const SESSION_MESSAGE_LIMIT = 5;
+const DAILY_MESSAGE_LIMIT = 10;
 const ACCENT = '#3d7a8a';
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -65,6 +68,7 @@ export default function ChatScreen() {
   const [pastSessionsVisible, setPastSessionsVisible] = useState(false);
   const [archivedSessions, setArchivedSessions] = useState<CoachSession[]>([]);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  const [dailyCount, setDailyCount] = useState(0);
 
   const listRef = useRef<FlatList>(null);
   const appliedInitialMessage = useRef<string | null>(null);
@@ -72,12 +76,14 @@ export default function ChatScreen() {
   // Initialize: load or create active session, load supporting data
   useEffect(() => {
     const init = async () => {
-      const [active, archived, memories, recent] = await Promise.all([
+      const [active, archived, memories, recent, count] = await Promise.all([
         getActiveCoachSession(),
         getArchivedCoachSessions(),
         getSessionMemorySummaries(),
-        getRecentDailySnapshots(5),
+        getRecentDailySnapshots(10),
+        getDailyCoachMessageCount(),
       ]);
+      setDailyCount(count);
 
       setRecentData(recent);
       setArchivedSessions(archived);
@@ -102,12 +108,15 @@ export default function ChatScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply initialMessage from HomeScreen only when session is fresh (no messages)
+  // Apply initialMessage from HomeScreen — update the seed as long as the user
+  // hasn't started typing. If there are user messages, the conversation is real and
+  // we leave it alone.
   useEffect(() => {
     const initialMessage = route.params?.initialMessage;
     if (!session || !initialMessage || initialMessage === appliedInitialMessage.current) return;
     appliedInitialMessage.current = initialMessage;
-    if (messages.length > 0) return; // don't disrupt an active conversation
+    const hasUserMessages = messages.some((m) => m.role === 'user');
+    if (hasUserMessages) return;
     const msg: ChatMessage = {
       id: generateId(),
       role: 'assistant',
@@ -157,6 +166,7 @@ export default function ChatScreen() {
   const handleSend = async () => {
     const text = input.trim();
     if (!text || isLoading || sessionState !== 'active' || !session) return;
+    if (dailyCount >= DAILY_MESSAGE_LIMIT) return;
 
     const userMessage: ChatMessage = {
       id: generateId(),
@@ -189,6 +199,8 @@ export default function ChatScreen() {
       setMessages(finalMessages);
       await updateCoachSessionMessages(session.id, finalMessages);
       sendSucceeded = true;
+      const newCount = await incrementDailyCoachMessageCount();
+      setDailyCount(newCount);
     } catch {
       const errorMessage: ChatMessage = {
         id: generateId(),
@@ -226,7 +238,8 @@ export default function ChatScreen() {
     listRef.current?.scrollToEnd({ animated: true });
   };
 
-  const inputDisabled = isLoading || sessionState !== 'active';
+  const dailyLimitReached = dailyCount >= DAILY_MESSAGE_LIMIT;
+  const inputDisabled = isLoading || sessionState !== 'active' || dailyLimitReached;
 
   // ─── Renderers ────────────────────────────────────────────────────────────
 
@@ -254,7 +267,7 @@ export default function ChatScreen() {
       <View style={styles.emptyState}>
         <Text style={styles.emptyTitle}>Ask about your progress</Text>
         <Text style={styles.emptySubtitle}>
-          I have access to your last 5 days of exercise and food data. Ask me anything.
+          I have access to your last 10 days of exercise and food data. Ask me anything.
         </Text>
         <View style={styles.suggestionsRow}>
           {['How am I doing this week?', 'Any patterns you notice?', 'What should I focus on?'].map(
@@ -378,15 +391,28 @@ export default function ChatScreen() {
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={styles.headerTitle}>AI Coach</Text>
-        <TouchableOpacity onPress={handleOpenPastSessions} activeOpacity={0.7}>
-          <Text style={styles.headerSubtitle}>
-            {recentData.length > 0
-              ? `${recentData.length} day${recentData.length !== 1 ? 's' : ''} of data · `
-              : ''}
-            <Text style={styles.headerSubtitleLink}>Past conversations →</Text>
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.headerTitle}>AI Coach</Text>
+            <TouchableOpacity onPress={handleOpenPastSessions} activeOpacity={0.7}>
+              <Text style={styles.headerSubtitle}>
+                {recentData.length > 0
+                  ? `${recentData.length} day${recentData.length !== 1 ? 's' : ''} of data · `
+                  : ''}
+                <Text style={styles.headerSubtitleLink}>Past conversations →</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {messages.length > 0 && (
+            <TouchableOpacity
+              onPress={handleStartFresh}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="create-outline" size={22} color={ACCENT} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Messages */}
@@ -417,31 +443,40 @@ export default function ChatScreen() {
         </View>
       )}
 
-      {/* Input bar */}
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom + Spacing.sm }]}>
-        <TextInput
-          style={[styles.input, inputDisabled && styles.inputDisabled]}
-          value={input}
-          onChangeText={setInput}
-          placeholder={
-            sessionState === 'ended'
-              ? 'Start a fresh session to continue…'
-              : 'Message your coach...'
-          }
-          placeholderTextColor={Colors.textTertiary}
-          multiline
-          maxLength={1000}
-          returnKeyType="default"
-          editable={!inputDisabled}
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!input.trim() || inputDisabled) && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!input.trim() || inputDisabled}
-        >
-          <Text style={styles.sendButtonText}>↑</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Input bar / daily limit */}
+      {dailyLimitReached ? (
+        <View style={[styles.limitBar, { paddingBottom: insets.bottom + Spacing.md }]}>
+          <Text style={styles.limitTitle}>Daily limit reached</Text>
+          <Text style={styles.limitSubtitle}>
+            You've used your {DAILY_MESSAGE_LIMIT} free messages today. Come back tomorrow.
+          </Text>
+        </View>
+      ) : (
+        <View style={[styles.inputBar, { paddingBottom: insets.bottom + Spacing.sm }]}>
+          <TextInput
+            style={[styles.input, inputDisabled && styles.inputDisabled]}
+            value={input}
+            onChangeText={setInput}
+            placeholder={
+              sessionState === 'ended'
+                ? 'Start a fresh session to continue…'
+                : 'Message your coach...'
+            }
+            placeholderTextColor={Colors.textTertiary}
+            multiline
+            maxLength={1000}
+            returnKeyType="default"
+            editable={!inputDisabled}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, (!input.trim() || inputDisabled) && styles.sendButtonDisabled]}
+            onPress={handleSend}
+            disabled={!input.trim() || inputDisabled}
+          >
+            <Text style={styles.sendButtonText}>↑</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Past Conversations Modal */}
       <Modal
@@ -503,6 +538,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.cardBackground,
     borderBottomWidth: 0.5,
     borderBottomColor: Colors.separator,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerTitle: {
     ...Typography.headline,
@@ -650,6 +690,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
     lineHeight: 22,
+  },
+  // ─── Daily limit bar ─────────────────────────────────────────────────────
+  limitBar: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
+    backgroundColor: Colors.cardBackground,
+    borderTopWidth: 0.5,
+    borderTopColor: Colors.separator,
+    alignItems: 'center',
+    gap: 4,
+  },
+  limitTitle: {
+    ...Typography.subheadline,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  limitSubtitle: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   // ─── Empty state ──────────────────────────────────────────────────────────
   emptyState: {
