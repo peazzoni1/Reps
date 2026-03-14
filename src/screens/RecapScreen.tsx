@@ -135,7 +135,7 @@ export default function TrackingScreen() {
   };
 
   const handleSaveExercise = async () => {
-    if (!editingSession || !selectedType || selectedFeelings.length === 0) return;
+    if (!editingSession || !selectedType) return;
     setSavingExercise(true);
     const typeData = MOVEMENT_TYPES.find(m => m.id === selectedType);
     await updateMovementSession(

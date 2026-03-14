@@ -45,7 +45,14 @@
       "expo-apple-authentication",
       "expo-secure-store",
       "expo-local-authentication",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#3d7a8a"
+        }
+      ]
     ],
     "extra": {
       "eas": {

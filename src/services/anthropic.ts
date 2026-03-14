@@ -1,4 +1,4 @@
-import { DailySnapshot, MemoryBullet } from '../types';
+import { DailySnapshot, MemoryBullet, MovementSession } from '../types';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-haiku-4-5-20251001';
@@ -264,4 +264,46 @@ export async function sendChatMessage(
 
   const json = await response.json();
   return (json.content?.[0]?.text as string) ?? '';
+}
+
+export async function generatePostWorkoutMessage(
+  session: MovementSession
+): Promise<{ title: string; body: string } | null> {
+  if (!API_KEY) return null;
+
+  const details = session.workoutDetails?.length
+    ? ` (${session.workoutDetails.map(w => `${w.name}${w.sets ? ` ${w.sets}x${w.reps}` : ''}${w.weight ? ` @ ${w.weight}lb` : ''}`).join(', ')})`
+    : '';
+  const feelings = session.feelings?.length ? ` — felt ${session.feelings.join(', ')}` : '';
+  const note = session.note ? ` — "${session.note}"` : '';
+  const sessionSummary = `${session.label}${details}${feelings}${note}`;
+
+  try {
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 120,
+        system: `You are a warm personal coach sending a short push notification to someone who just logged a workout. Write something brief, specific to what they did, and genuinely encouraging — not hollow or generic. No exclamation marks. No "great job" or "keep it up".
+
+Respond with a valid JSON object only:
+{"title": "5-7 words max", "body": "one sentence, specific to their session"}`,
+        messages: [{ role: 'user', content: `The user just logged: ${sessionSummary}` }],
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const json = await response.json();
+    const raw = (json.content?.[0]?.text as string) ?? '';
+    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return JSON.parse(cleaned) as { title: string; body: string };
+  } catch {
+    return null;
+  }
 }

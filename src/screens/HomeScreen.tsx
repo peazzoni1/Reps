@@ -32,6 +32,7 @@ import { Colors, Typography, Spacing, BorderRadius } from '../theme';
 import { supabase } from '../lib/supabase';
 import QuickLogCard from '../components/QuickLogCard';
 import { getDailyCheckIn } from '../services/anthropic';
+import { schedulePostWorkoutNotification } from '../services/notifications';
 import { TabParamList } from '../navigation/TabNavigator';
 
 type WeatherInfo = { temp: number; iconName: string };
@@ -146,7 +147,7 @@ export default function HomeScreen() {
   };
 
   const handleSave = async (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[] }) => {
-    await createMovementSession(
+    const session = await createMovementSession(
       entry.type,
       entry.feelings,
       entry.label,
@@ -154,6 +155,7 @@ export default function HomeScreen() {
       entry.workoutDetails
     );
     loadCoachMessage(true);
+    schedulePostWorkoutNotification(session).catch(() => {});
   };
 
   const handleLogout = async () => {
