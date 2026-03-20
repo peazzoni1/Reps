@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SeasonTheme, MovementType, FeelingType, WorkoutExercise } from '../types';
 import { MOVEMENT_TYPES, FEELINGS } from '../constants/seasonal';
-import { getCustomTags, addCustomTag, getCustomMovementTypes, addCustomMovementType, ActivityPreference, getActivityPreferences, saveActivityPreferences } from '../services/storage';
+import { getCustomTags, addCustomTag, getCustomMovementTypes, addCustomMovementType, ActivityPreference, getActivityPreferences, saveActivityPreferences, toLocalDateStr } from '../services/storage';
 
 const hexToRgba = (hex: string, alpha: number): string => {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -25,7 +25,7 @@ const hexToRgba = (hex: string, alpha: number): string => {
 
 interface QuickLogCardProps {
   season: SeasonTheme;
-  onSave: (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[] }) => void;
+  onSave: (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[]; date: string }) => void;
 }
 
 type ActivityItem = { id: string; label: string; icon: string };
@@ -49,6 +49,20 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
   const [activityPrefs, setActivityPrefs] = useState<ActivityPreference[]>([]);
   const [customizeVisible, setCustomizeVisible] = useState(false);
   const [draftPrefs, setDraftPrefs] = useState<ActivityPreference[]>([]);
+
+  const todayStr = toLocalDateStr(new Date());
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = toLocalDateStr(yesterdayDate);
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [showMoreDates, setShowMoreDates] = useState(false);
+
+  const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const moreDates = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (i + 2));
+    return { label: DAY_NAMES[d.getDay()], date: toLocalDateStr(d) };
+  });
 
   const feelingOpacity = useRef(new Animated.Value(0)).current;
   const feelingTranslateY = useRef(new Animated.Value(12)).current;
@@ -163,6 +177,8 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
     setShowCustomMovementInput(false);
     setCustomMovementInput('');
     setWorkoutExercises([{ name: '', sets: undefined, reps: undefined, weight: undefined }]);
+    setSelectedDate(toLocalDateStr(new Date()));
+    setShowMoreDates(false);
     feelingOpacity.setValue(0);
     feelingTranslateY.setValue(12);
     saveOpacity.setValue(0);
@@ -190,6 +206,7 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
         feelings: selectedFeelings,
         note: note || undefined,
         workoutDetails: validExercises && validExercises.length > 0 ? validExercises : undefined,
+        date: selectedDate,
       });
       resetState();
     }
@@ -242,8 +259,8 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
   return (
     <View style={[styles.card, { backgroundColor: season.cardBg }]}>
       <View style={styles.cardHeader}>
-        <Text style={[styles.cardLabel, { color: season.color }]}>
-          ▸ Log A Session
+        <Text style={[styles.cardTitle, { color: season.color }]}>
+          ▸ Log Activity
         </Text>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={openCustomize} style={styles.customizeButton} activeOpacity={0.7}>
@@ -262,6 +279,46 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
           )}
         </View>
       </View>
+
+      <View style={[styles.datePillRow, { marginBottom: showMoreDates ? 8 : 16 }]}>
+        {[{ label: 'Today', date: todayStr }, { label: 'Yesterday', date: yesterdayStr }].map(({ label, date }) => (
+          <TouchableOpacity
+            key={date}
+            style={[styles.datePill, selectedDate === date && { borderColor: season.color, backgroundColor: hexToRgba(season.color, 0.1) }]}
+            onPress={() => setSelectedDate(date)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.datePillText, { color: selectedDate === date ? season.color : season.textSecondary }]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          onPress={() => setShowMoreDates(v => !v)}
+          style={[styles.datePill, { borderStyle: 'dashed', borderColor: hexToRgba(season.color, 0.3) }]}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.datePillText, { color: season.textSecondary }]}>
+            {showMoreDates ? 'Less' : 'More'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      {showMoreDates && (
+        <View style={styles.expandedDatesRow}>
+          {moreDates.map(({ label, date }) => (
+            <TouchableOpacity
+              key={date}
+              style={[styles.datePill, selectedDate === date && { borderColor: season.color, backgroundColor: hexToRgba(season.color, 0.1) }]}
+              onPress={() => setSelectedDate(date)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.datePillText, { color: selectedDate === date ? season.color : season.textSecondary }]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <View style={styles.optionsContainer}>
         {displayedTypes.map((type) => (
@@ -628,7 +685,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  datePillRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  expandedDatesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 16,
+  },
+  datePill: {
+    paddingVertical: 5,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e8d5d0',
+  },
+  datePillActive: {
+    borderColor: '#e8d5d0',
+  },
+  datePillText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   headerActions: {
     flexDirection: 'row',
@@ -641,6 +722,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'Nunito_600SemiBold',
     textTransform: 'uppercase',
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
     flex: 1,
   },
   question: {

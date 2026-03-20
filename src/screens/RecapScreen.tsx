@@ -263,9 +263,6 @@ export default function TrackingScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <Text style={styles.headerTitle}>Tracking</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => openModal()}>
-          <Text style={styles.addButtonText}>+ Food</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -277,8 +274,7 @@ export default function TrackingScreen() {
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>Nothing logged yet</Text>
           <Text style={styles.emptySubtitle}>
-            Log exercise on the Today tab, or tap{' '}
-            <Text style={{ color: Colors.accent }}>+ Food</Text> to add a meal.
+            Log activity or food on the Today tab to see it here.
           </Text>
         </View>
       ) : (

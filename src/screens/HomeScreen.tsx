@@ -5,6 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
   Modal,
   Alert,
 } from 'react-native';
@@ -15,9 +17,10 @@ import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { FeelingType, MovementType, WorkoutExercise } from '../types';
+import { FeelingType, MealType, MovementType, WorkoutExercise } from '../types';
 import {
   createMovementSession,
+  createFoodEntry,
   getRecentDailySnapshots,
   getCachedDailyMessage,
   storeDailyMessage,
@@ -49,6 +52,13 @@ function getWeatherIconName(code: number): string {
 
 type HomeNavigationProp = BottomTabNavigationProp<TabParamList, 'Today'>;
 
+const MEALS: { id: MealType; label: string; icon: string }[] = [
+  { id: 'breakfast', label: 'Breakfast', icon: '☀️' },
+  { id: 'lunch', label: 'Lunch', icon: '🌤' },
+  { id: 'dinner', label: 'Dinner', icon: '🌙' },
+  { id: 'snack', label: 'Snack', icon: '🍎' },
+];
+
 export default function HomeScreen() {
   const navigation = useNavigation<HomeNavigationProp>();
   const [profileVisible, setProfileVisible] = useState(false);
@@ -62,6 +72,27 @@ export default function HomeScreen() {
   const [fontsLoaded] = useFonts({ Nunito_700Bold, Nunito_600SemiBold });
   const season = getBlendedTheme();
   const insets = useSafeAreaInsets();
+
+  // Toggle state
+  const [activeTab, setActiveTab] = useState<'activity' | 'food'>('activity');
+
+  // Food card state
+  const todayStr = toLocalDateStr(new Date());
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = toLocalDateStr(yesterdayDate);
+  const [foodDescription, setFoodDescription] = useState('');
+  const [selectedFoodMeal, setSelectedFoodMeal] = useState<MealType | null>(null);
+  const [selectedFoodDate, setSelectedFoodDate] = useState<string>(todayStr);
+  const [foodSaving, setFoodSaving] = useState(false);
+  const [showMoreFoodDates, setShowMoreFoodDates] = useState(false);
+
+  const FOOD_DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const moreFoodDates = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (i + 2));
+    return { label: FOOD_DAY_NAMES[d.getDay()], date: toLocalDateStr(d) };
+  });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -146,16 +177,29 @@ export default function HomeScreen() {
     }
   };
 
-  const handleSave = async (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[] }) => {
+  const handleSave = async (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[]; date: string }) => {
     const session = await createMovementSession(
       entry.type,
       entry.feelings,
       entry.label,
       entry.note,
-      entry.workoutDetails
+      entry.workoutDetails,
+      entry.date
     );
     loadCoachMessage(true);
     schedulePostWorkoutNotification(session).catch(() => {});
+  };
+
+  const handleSaveFood = async () => {
+    const desc = foodDescription.trim();
+    if (!desc) return;
+    setFoodSaving(true);
+    await createFoodEntry(desc, selectedFoodMeal ?? undefined, selectedFoodDate);
+    setFoodSaving(false);
+    setFoodDescription('');
+    setSelectedFoodMeal(null);
+    setSelectedFoodDate(todayStr);
+    setShowMoreFoodDates(false);
   };
 
   const handleLogout = async () => {
@@ -311,8 +355,116 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Activity / Food toggle */}
+        <View style={styles.segmentControl}>
+          <TouchableOpacity
+            style={[styles.segment, activeTab === 'activity' && styles.segmentActive]}
+            onPress={() => setActiveTab('activity')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.segmentText, activeTab === 'activity' && styles.segmentTextActive]}>Activity</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segment, activeTab === 'food' && styles.segmentActive]}
+            onPress={() => setActiveTab('food')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.segmentText, activeTab === 'food' && styles.segmentTextActive]}>Food</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Quick log card */}
-        <QuickLogCard season={{ ...season, color: '#3d7a8a', accent: '#7ab8c8', cardBg: '#fffaf8', textSecondary: '#7a9aaa' }} onSave={handleSave} />
+        {activeTab === 'activity' && (
+          <QuickLogCard season={{ ...season, color: '#3d7a8a', accent: '#7ab8c8', cardBg: '#fffaf8', textSecondary: '#7a9aaa' }} onSave={handleSave} />
+        )}
+
+        {/* Food log card */}
+        {activeTab === 'food' && (
+          <View style={styles.foodCard}>
+            <Text style={styles.foodCardHeader}>▸ Log Food</Text>
+
+            <View style={styles.foodPillRow}>
+              {MEALS.map(meal => (
+                <TouchableOpacity
+                  key={meal.id}
+                  style={[styles.foodPill, selectedFoodMeal === meal.id && styles.foodPillActive]}
+                  onPress={() => setSelectedFoodMeal(prev => prev === meal.id ? null : meal.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.foodPillIcon}>{meal.icon}</Text>
+                  <Text style={[styles.foodPillText, selectedFoodMeal === meal.id && styles.foodPillTextActive]}>
+                    {meal.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={[styles.foodPillRow, { marginTop: 4, marginBottom: showMoreFoodDates ? 4 : 0 }]}>
+              {[{ label: 'Today', date: todayStr }, { label: 'Yesterday', date: yesterdayStr }].map(({ label, date }) => (
+                <TouchableOpacity
+                  key={date}
+                  style={[styles.foodPill, selectedFoodDate === date && styles.foodPillActive]}
+                  onPress={() => setSelectedFoodDate(date)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.foodPillText, selectedFoodDate === date && styles.foodPillTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                onPress={() => setShowMoreFoodDates(v => !v)}
+                style={[styles.foodPill, { borderStyle: 'dashed' }]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.foodPillText, { opacity: 0.6 }]}>
+                  {showMoreFoodDates ? 'Less' : 'More'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {showMoreFoodDates && (
+              <View style={styles.foodPillRow}>
+                {moreFoodDates.map(({ label, date }) => (
+                  <TouchableOpacity
+                    key={date}
+                    style={[styles.foodPill, selectedFoodDate === date && styles.foodPillActive]}
+                    onPress={() => setSelectedFoodDate(date)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.foodPillText, selectedFoodDate === date && styles.foodPillTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <TextInput
+              style={styles.foodInput}
+              value={foodDescription}
+              onChangeText={setFoodDescription}
+              placeholder="What did you eat?"
+              placeholderTextColor="#7a9aaa"
+              multiline
+              maxLength={300}
+            />
+
+            {foodDescription.trim().length > 0 && (
+              <TouchableOpacity
+                style={[styles.foodSaveBtn, foodSaving && styles.foodSaveBtnDisabled]}
+                onPress={handleSaveFood}
+                disabled={foodSaving}
+                activeOpacity={0.8}
+              >
+                {foodSaving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.foodSaveBtnText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
       </ScrollView>
 
@@ -475,6 +627,110 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     backgroundColor: Colors.separator,
+  },
+  // Segment control
+  segmentControl: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(61, 122, 138, 0.08)',
+    borderRadius: BorderRadius.pill,
+    padding: 3,
+    marginBottom: 16,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.pill,
+    alignItems: 'center',
+  },
+  segmentActive: {
+    backgroundColor: '#3d7a8a',
+    shadowColor: '#3d7a8a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3d7a8a',
+  },
+  segmentTextActive: {
+    color: '#fff',
+  },
+  // Food card
+  foodCard: {
+    backgroundColor: '#fffaf8',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(61, 122, 138, 0.15)',
+    padding: 18,
+    gap: 14,
+    shadowColor: '#d4a5a0',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  foodCardHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#3d7a8a',
+    letterSpacing: 0.5,
+  },
+  foodPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  foodPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+    borderRadius: BorderRadius.pill,
+    borderWidth: 1.5,
+    borderColor: 'rgba(61, 122, 138, 0.2)',
+    backgroundColor: 'transparent',
+  },
+  foodPillActive: {
+    borderColor: '#3d7a8a',
+    backgroundColor: 'rgba(61, 122, 138, 0.08)',
+  },
+  foodPillIcon: {
+    fontSize: 13,
+  },
+  foodPillText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#7a9aaa',
+  },
+  foodPillTextActive: {
+    color: '#3d7a8a',
+  },
+  foodInput: {
+    fontSize: 15,
+    color: '#1a3a44',
+    backgroundColor: 'rgba(61, 122, 138, 0.05)',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    minHeight: 72,
+    textAlignVertical: 'top',
+  },
+  foodSaveBtn: {
+    backgroundColor: '#3d7a8a',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    alignItems: 'center',
+  },
+  foodSaveBtnDisabled: {
+    backgroundColor: Colors.separator,
+  },
+  foodSaveBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
   // Profile modal
   modalOverlay: {

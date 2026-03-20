@@ -20,7 +20,8 @@ export const createMovementSession = async (
   feelings: FeelingType[],
   label: string,
   note?: string,
-  workoutDetails?: WorkoutExercise[]
+  workoutDetails?: WorkoutExercise[],
+  date?: string
 ): Promise<MovementSession> => {
   const sessions = await getAllMovementSessions();
   const newSession: MovementSession = {
@@ -28,7 +29,7 @@ export const createMovementSession = async (
     type,
     feelings,
     label,
-    date: new Date().toISOString(),
+    date: date ? `${date}T12:00:00.000Z` : new Date().toISOString(),
     note,
     workoutDetails,
   };
