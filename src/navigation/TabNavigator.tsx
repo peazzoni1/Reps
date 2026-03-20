@@ -23,18 +23,18 @@ export default function TabNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#3d7a8a',
-        tabBarInactiveTintColor: '#9aafb5',
+        tabBarActiveTintColor: '#3db88a',
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.55)',
         tabBarStyle: {
-          backgroundColor: '#faf8f6',
-          borderTopColor: 'rgba(61, 122, 138, 0.1)',
+          backgroundColor: '#141b2d',
+          borderTopColor: 'rgba(255, 255, 255, 0.15)',
           borderTopWidth: 0.5,
           paddingTop: 8,
           height: Platform.OS === 'ios' ? 88 : 60,
         },
         tabBarLabelStyle: {
           fontSize: Typography.caption1.fontSize,
-          fontWeight: '500' as const,
+          fontWeight: '600' as const,
           fontFamily: fontsLoaded ? 'Nunito_400Regular' : undefined,
           marginBottom: Platform.OS === 'ios' ? 4 : 8,
         },
