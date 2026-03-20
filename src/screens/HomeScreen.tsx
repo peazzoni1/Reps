@@ -10,13 +10,11 @@ import {
   Modal,
   Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
 import { FeelingType, MealType, MovementType, WorkoutExercise } from '../types';
 import {
   createMovementSession,
@@ -31,12 +29,11 @@ import {
   DailyCheckInMessage,
 } from '../services/storage';
 import { getBlendedTheme } from '../constants/seasonal';
-import { Colors, Typography, Spacing, BorderRadius } from '../theme';
+import { Typography, Spacing, BorderRadius } from '../theme';
 import { supabase } from '../lib/supabase';
 import QuickLogCard from '../components/QuickLogCard';
 import { getDailyCheckIn } from '../services/anthropic';
 import { schedulePostWorkoutNotification } from '../services/notifications';
-import { TabParamList } from '../navigation/TabNavigator';
 
 type WeatherInfo = { temp: number; iconName: string };
 
@@ -50,17 +47,14 @@ function getWeatherIconName(code: number): string {
   return 'thunderstorm-outline';
 }
 
-type HomeNavigationProp = BottomTabNavigationProp<TabParamList, 'Today'>;
-
-const MEALS: { id: MealType; label: string; icon: string }[] = [
-  { id: 'breakfast', label: 'Breakfast', icon: '☀️' },
-  { id: 'lunch', label: 'Lunch', icon: '🌤' },
-  { id: 'dinner', label: 'Dinner', icon: '🌙' },
-  { id: 'snack', label: 'Snack', icon: '🍎' },
+const MEALS: { id: MealType; label: string; icon: string; color: string }[] = [
+  { id: 'breakfast', label: 'Breakfast', icon: '☀️', color: 'rgba(255, 193, 7, 0.15)' },
+  { id: 'lunch', label: 'Lunch', icon: '🌤', color: 'rgba(255, 152, 0, 0.15)' },
+  { id: 'dinner', label: 'Dinner', icon: '🌙', color: 'rgba(103, 58, 183, 0.15)' },
+  { id: 'snack', label: 'Snack', icon: '🍎', color: 'rgba(244, 67, 54, 0.15)' },
 ];
 
 export default function HomeScreen() {
-  const navigation = useNavigation<HomeNavigationProp>();
   const [profileVisible, setProfileVisible] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [coachMessage, setCoachMessage] = useState<DailyCheckInMessage | null>(null);
@@ -169,13 +163,6 @@ export default function HomeScreen() {
     loadCoachMessage();
   }, [loadCoachMessage]));
 
-  const handleTellMeMore = () => {
-    if (coachMessage) {
-      navigation.navigate('Coach', {
-        initialMessage: `${coachMessage.headline}\n\n${coachMessage.body}`,
-      });
-    }
-  };
 
   const handleSave = async (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[]; date: string }) => {
     const session = await createMovementSession(
@@ -257,10 +244,10 @@ export default function HomeScreen() {
 
   const initials = userEmail ? userEmail[0].toUpperCase() : '?';
 
-  const ACCENT = '#3d7a8a';
+  const ACCENT = '#3db88a';
 
   return (
-    <LinearGradient colors={['#f0f6fa', '#fdf4f0']} style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <Text style={[styles.headerTitle, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>Today</Text>
@@ -286,15 +273,36 @@ export default function HomeScreen() {
       >
         {/* AI Coach Daily Check-In */}
         <View style={styles.coachCard}>
-          <LinearGradient
-            colors={['#ffffff', '#fff5f2']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.coachAccentBar} />
           <View style={styles.coachCardContent}>
-            <Text style={[styles.coachLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>✦ AI Coach · Daily Check-In</Text>
+            <View style={styles.coachHeader}>
+              <Text style={[styles.coachLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>✨ AI COACH · DAILY CHECK-IN</Text>
+              {coachMessage && (
+                <View style={styles.feedbackRow}>
+                  <TouchableOpacity
+                    onPress={() => setCoachFeedback(coachFeedback === 'up' ? null : 'up')}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={coachFeedback === 'up' ? 'thumbs-up' : 'thumbs-up-outline'}
+                      size={18}
+                      color={coachFeedback === 'up' ? ACCENT : 'rgba(255, 255, 255, 0.3)'}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setCoachFeedback(coachFeedback === 'down' ? null : 'down')}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={coachFeedback === 'down' ? 'thumbs-down' : 'thumbs-down-outline'}
+                      size={18}
+                      color={coachFeedback === 'down' ? ACCENT : 'rgba(255, 255, 255, 0.3)'}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
             {coachLoading ? (
               <View style={styles.coachMessagePlaceholder}>
                 <View style={[styles.placeholderLine, { width: '60%', height: 16, marginBottom: 8 }]} />
@@ -308,47 +316,16 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={styles.coachBody} numberOfLines={coachExpanded ? undefined : 3}>
                   {coachMessage.body}
+                  {sessionCount > 0 && (
+                    <Text style={styles.sessionContext}>
+                      {' '}(Based on your last <Text style={styles.sessionCount}>{sessionCount}</Text> session{sessionCount !== 1 ? 's' : ''})
+                    </Text>
+                  )}
                 </Text>
                 {!coachExpanded && (
                   <TouchableOpacity onPress={() => setCoachExpanded(true)} activeOpacity={0.7}>
                     <Text style={styles.readMore}>Read more</Text>
                   </TouchableOpacity>
-                )}
-                {sessionCount > 0 && (
-                  <Text style={styles.coachCaption}>
-                    ↑ Based on your last {sessionCount} session{sessionCount !== 1 ? 's' : ''}
-                  </Text>
-                )}
-                {coachExpanded && (
-                  <>
-                    <TouchableOpacity onPress={handleTellMeMore} activeOpacity={0.7} style={styles.tellMeMoreRow}>
-                      <Text style={styles.tellMeMore}>Tell me more →</Text>
-                    </TouchableOpacity>
-                    <View style={styles.feedbackRow}>
-                      <TouchableOpacity
-                        onPress={() => setCoachFeedback(coachFeedback === 'up' ? null : 'up')}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons
-                          name={coachFeedback === 'up' ? 'thumbs-up' : 'thumbs-up-outline'}
-                          size={18}
-                          color={coachFeedback === 'up' ? ACCENT : '#b0bec5'}
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => setCoachFeedback(coachFeedback === 'down' ? null : 'down')}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons
-                          name={coachFeedback === 'down' ? 'thumbs-down' : 'thumbs-down-outline'}
-                          size={18}
-                          color={coachFeedback === 'down' ? ACCENT : '#b0bec5'}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </>
                 )}
               </>
             ) : null}
@@ -375,19 +352,23 @@ export default function HomeScreen() {
 
         {/* Quick log card */}
         {activeTab === 'activity' && (
-          <QuickLogCard season={{ ...season, color: '#3d7a8a', accent: '#7ab8c8', cardBg: '#fffaf8', textSecondary: '#7a9aaa' }} onSave={handleSave} />
+          <QuickLogCard season={{ ...season, color: '#3db88a', accent: '#7ab8c8', cardBg: 'rgba(255, 255, 255, 0.06)', textSecondary: 'rgba(255, 255, 255, 0.55)' }} onSave={handleSave} />
         )}
 
         {/* Food log card */}
         {activeTab === 'food' && (
           <View style={styles.foodCard}>
-            <Text style={styles.foodCardHeader}>▸ Log Food</Text>
+            <Text style={styles.foodCardHeader}>🍽️ LOG FOOD</Text>
 
             <View style={styles.foodPillRow}>
               {MEALS.map(meal => (
                 <TouchableOpacity
                   key={meal.id}
-                  style={[styles.foodPill, selectedFoodMeal === meal.id && styles.foodPillActive]}
+                  style={[
+                    styles.foodPill,
+                    selectedFoodMeal === meal.id && styles.foodPillActive,
+                    { backgroundColor: selectedFoodMeal === meal.id ? meal.color : 'transparent' }
+                  ]}
                   onPress={() => setSelectedFoodMeal(prev => prev === meal.id ? null : meal.id)}
                   activeOpacity={0.7}
                 >
@@ -444,7 +425,7 @@ export default function HomeScreen() {
               value={foodDescription}
               onChangeText={setFoodDescription}
               placeholder="What did you eat?"
-              placeholderTextColor="#7a9aaa"
+              placeholderTextColor="rgba(255, 255, 255, 0.3)"
               multiline
               maxLength={300}
             />
@@ -501,49 +482,58 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#1f2e4f',
   },
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.md,
-    backgroundColor: 'rgba(245, 250, 252, 0.97)',
+    paddingHorizontal: 24,
+    paddingBottom: 14,
+    backgroundColor: 'rgba(31, 46, 79, 0.97)',
     borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(61, 122, 138, 0.12)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
   },
   headerTitle: {
     ...Typography.headline,
-    color: '#3d7a8a',
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '700',
   },
   userButton: {
-    backgroundColor: '#3d7a8a',
+    backgroundColor: '#3db88a',
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.pill,
   },
   userInitials: {
     ...Typography.footnote,
-    color: '#fff',
+    color: '#ffffff',
     fontWeight: '600',
   },
   weatherBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
+    backgroundColor: 'rgba(61, 184, 138, 0.12)',
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: 'rgba(61, 184, 138, 0.2)',
   },
   weatherText: {
     fontSize: 13,
-    fontWeight: '500',
-    color: '#3d7a8a',
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   // Content
   scrollView: {
@@ -553,130 +543,130 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   coachCard: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 24,
+    marginBottom: 20,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(61, 122, 138, 0.15)',
-    shadowColor: '#d4a5a0',
-    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 0.5,
+    borderColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    shadowColor: '#3db88a',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  coachAccentBar: {
-    width: 4,
-    backgroundColor: '#3d7a8a',
+    shadowRadius: 12,
+    elevation: 8,
   },
   coachCardContent: {
     flex: 1,
-    padding: 18,
-    gap: 8,
+    padding: 20,
+    gap: 12,
+  },
+  coachHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   coachLabel: {
-    fontSize: 11,
-    letterSpacing: 1.5,
-    fontWeight: '600',
+    fontSize: 10,
+    letterSpacing: 1.8,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    color: '#3d7a8a',
+    color: '#3db88a',
   },
   coachHeadline: {
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: '600',
-    color: Colors.textPrimary,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.3,
   },
   coachBody: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 23,
     fontWeight: '400',
-    color: Colors.textPrimary,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  sessionContext: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '400',
+  },
+  sessionCount: {
+    color: '#f5a623',
+    fontWeight: '700',
   },
   readMore: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#3d7a8a',
-    marginTop: 2,
-  },
-  coachCaption: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  tellMeMoreRow: {
-    marginTop: 6,
-    paddingTop: 10,
-    borderTopWidth: 0.5,
-    borderTopColor: 'rgba(61, 122, 138, 0.12)',
-  },
-  tellMeMore: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#3d7a8a',
+    fontWeight: '600',
+    color: '#3db88a',
+    marginTop: 4,
+    letterSpacing: 0.2,
   },
   feedbackRow: {
     flexDirection: 'row',
     gap: 16,
-    marginTop: 10,
   },
   coachMessagePlaceholder: {
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   placeholderLine: {
     height: 14,
-    borderRadius: 7,
-    backgroundColor: Colors.separator,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   // Segment control
   segmentControl: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(61, 122, 138, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: BorderRadius.pill,
-    padding: 3,
-    marginBottom: 16,
+    padding: 4,
+    marginBottom: 20,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   segment: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: BorderRadius.pill,
     alignItems: 'center',
   },
   segmentActive: {
-    backgroundColor: '#3d7a8a',
-    shadowColor: '#3d7a8a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
+    backgroundColor: '#3db88a',
+    shadowColor: '#3db88a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
   },
   segmentText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#3d7a8a',
+    color: 'rgba(255, 255, 255, 0.5)',
+    letterSpacing: 0.3,
   },
   segmentTextActive: {
-    color: '#fff',
+    color: '#ffffff',
+    fontWeight: '700',
   },
   // Food card
   foodCard: {
-    backgroundColor: '#fffaf8',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(61, 122, 138, 0.15)',
-    padding: 18,
-    gap: 14,
-    shadowColor: '#d4a5a0',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 24,
+    borderWidth: 0.5,
+    borderColor: '#ffffff',
+    padding: 20,
+    gap: 16,
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   foodCardHeader: {
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#3d7a8a',
-    letterSpacing: 0.5,
+    color: '#3db88a',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
   },
   foodPillRow: {
     flexDirection: 'row',
@@ -690,13 +680,12 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 13,
     borderRadius: BorderRadius.pill,
-    borderWidth: 1.5,
-    borderColor: 'rgba(61, 122, 138, 0.2)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     backgroundColor: 'transparent',
   },
   foodPillActive: {
-    borderColor: '#3d7a8a',
-    backgroundColor: 'rgba(61, 122, 138, 0.08)',
+    borderColor: '#ffffff',
   },
   foodPillIcon: {
     fontSize: 13,
@@ -704,33 +693,42 @@ const styles = StyleSheet.create({
   foodPillText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#7a9aaa',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   foodPillTextActive: {
-    color: '#3d7a8a',
+    color: '#ffffff',
+    fontWeight: '600',
   },
   foodInput: {
     fontSize: 15,
-    color: '#1a3a44',
-    backgroundColor: 'rgba(61, 122, 138, 0.05)',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    minHeight: 72,
+    lineHeight: 21,
+    color: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
+    padding: 14,
+    minHeight: 80,
     textAlignVertical: 'top',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   foodSaveBtn: {
-    backgroundColor: '#3d7a8a',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: '#f5a623',
+    borderRadius: 12,
     padding: Spacing.base,
     alignItems: 'center',
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   foodSaveBtnDisabled: {
-    backgroundColor: Colors.separator,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   foodSaveBtnText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: '#ffffff',
   },
   // Profile modal
   modalOverlay: {
@@ -739,65 +737,80 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.overlay,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalSheet: {
-    backgroundColor: Colors.cardBackground,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: Spacing.xl,
+    backgroundColor: '#1f2e4f',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
     alignItems: 'center',
-    gap: Spacing.md,
+    gap: 14,
+    borderTopWidth: 0.5,
+    borderLeftWidth: 0.5,
+    borderRightWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   modalHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.separator,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginBottom: Spacing.sm,
   },
   avatar: {
-    width: 72,
-    height: 72,
+    width: 80,
+    height: 80,
     borderRadius: BorderRadius.round,
-    backgroundColor: Colors.accentLight,
+    backgroundColor: 'rgba(61, 184, 138, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2.5,
+    borderColor: '#3db88a',
   },
   avatarInitials: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: Colors.accent,
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#3db88a',
   },
   email: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 4,
   },
   divider: {
     width: '100%',
     height: 0.5,
-    backgroundColor: Colors.separator,
-    marginVertical: Spacing.xs,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    marginVertical: 12,
   },
   logoutButton: {
     width: '100%',
-    padding: Spacing.base,
-    borderRadius: BorderRadius.lg,
+    padding: 14,
+    borderRadius: 14,
     alignItems: 'center',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: 'rgba(255, 80, 80, 0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 80, 80, 0.35)',
   },
   logoutText: {
-    ...Typography.headline,
-    color: Colors.destructive,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ff6b6b',
   },
   deleteButton: {
     width: '100%',
-    padding: Spacing.base,
-    borderRadius: BorderRadius.lg,
+    padding: 14,
+    borderRadius: 14,
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   deleteText: {
-    ...Typography.subheadline,
-    color: Colors.textTertiary,
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.4)',
   },
 });

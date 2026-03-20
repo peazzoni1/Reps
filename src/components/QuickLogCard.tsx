@@ -257,10 +257,10 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
   const allTypesForModal = getAllTypes();
 
   return (
-    <View style={[styles.card, { backgroundColor: season.cardBg }]}>
+    <View style={[styles.card, { backgroundColor: season.cardBg, borderColor: '#ffffff' }]}>
       <View style={styles.cardHeader}>
         <Text style={[styles.cardTitle, { color: season.color }]}>
-          ▸ Log Activity
+          🏃 LOG ACTIVITY
         </Text>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={openCustomize} style={styles.customizeButton} activeOpacity={0.7}>
@@ -336,13 +336,16 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
             ]}
             activeOpacity={0.7}
           >
+            <Text style={[styles.optionText, { color: season.color }]}>
+              {type.icon}
+            </Text>
             <Text
               style={[
                 styles.optionText,
                 { color: selectedType === type.id ? season.color : season.textSecondary },
               ]}
             >
-              {type.icon}  {type.label}
+              {type.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -601,7 +604,7 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
         >
           <TouchableOpacity
             onPress={handleSave}
-            style={[styles.saveButton, { backgroundColor: season.color }]}
+            style={[styles.saveButton, { backgroundColor: '#f5a623', shadowColor: '#f5a623' }]}
             activeOpacity={0.8}
           >
             <Text style={styles.saveButtonText}>Log it</Text>
@@ -672,14 +675,15 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 20,
     marginBottom: 28,
-    shadowColor: '#d4a5a0',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 0.5,
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -701,8 +705,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 14,
     borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#e8d5d0',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   datePillActive: {
     borderColor: '#e8d5d0',
@@ -725,9 +729,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardTitle: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
     flex: 1,
   },
   question: {
@@ -759,10 +764,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: 20,
-    borderWidth: 2,
+    borderWidth: 0.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   optionInactive: {
-    borderColor: '#e8d5d0',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     backgroundColor: 'transparent',
   },
   optionText: {
@@ -779,8 +787,8 @@ const styles = StyleSheet.create({
   noteInput: {
     width: '100%',
     padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: 14,
+    borderWidth: 0.5,
     fontSize: 14,
     minHeight: 80,
     maxHeight: 100,
@@ -790,12 +798,16 @@ const styles = StyleSheet.create({
   saveButton: {
     width: '100%',
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   saveButtonText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.2,
@@ -810,7 +822,7 @@ const styles = StyleSheet.create({
     width: '100%',
     padding: 12,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 0.5,
     fontSize: 14,
     marginBottom: 8,
   },
@@ -822,7 +834,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: 0.5,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -861,7 +873,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 0.5,
     fontSize: 14,
   },
   addTagButton: {
@@ -878,7 +890,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 20,
-    borderWidth: 1.5,
+    borderWidth: 0.5,
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 52,
@@ -978,7 +990,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 6,
-    borderWidth: 1.5,
+    borderWidth: 0.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
