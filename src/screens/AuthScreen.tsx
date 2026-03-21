@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,32 +9,18 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
-  Animated,
-  Easing,
   Modal,
   ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFonts, Nunito_200ExtraLight, Nunito_300Light } from '@expo-google-fonts/nunito';
+import { useFonts, Nunito_700Bold } from '@expo-google-fonts/nunito';
 import { supabase } from '../lib/supabase';
-import { Typography, Spacing, BorderRadius } from '../theme';
 
 const CREDENTIALS_KEY = 'bluefitness_credentials';
-
-// Four gradient states to cycle through — sky blue → peach warmth → dusty rose → deep blue
-const GRADIENTS = [
-  ['#2E86C1', '#5BA4CF', '#F2CDAA', '#E8A0A8', '#1A5276'],
-  ['#1A5276', '#4A90BE', '#F5D5B8', '#E8A0A8', '#2E6FA3'],
-  ['#3A7DAF', '#5BA4CF', '#E8A0A8', '#D490A0', '#1A5276'],
-  ['#2E86C1', '#6AB0D4', '#F2CDAA', '#C890A0', '#1A3D5C'],
-] as const;
-
-const LOCATIONS = [0, 0.2, 0.45, 0.65, 1] as const;
 
 // Three concentric semicircle arcs — open at the bottom, sunrise shape.
 // ViewBox: 0 0 80 60. Center X=40, base Y=58. Radii: 15, 25, 35.
@@ -49,7 +35,7 @@ const ARC_PATHS = [
 ];
 const ARC_OPACITIES = [1.0, 0.6, 0.3];
 
-// Static stacked arc logo
+// Static stacked arc logo with teal gradient
 function ArcLogo() {
   return (
     <Svg width={80} height={60} viewBox="0 0 80 60">
@@ -58,62 +44,12 @@ function ArcLogo() {
           key={i}
           d={arc.d}
           fill="none"
-          stroke={`rgba(255,255,255,${ARC_OPACITIES[i]})`}
+          stroke={i === 0 ? '#3db88a' : `rgba(61, 184, 138, ${ARC_OPACITIES[i]})`}
           strokeWidth={2.5}
           strokeLinecap="round"
         />
       ))}
     </Svg>
-  );
-}
-
-// Animated gradient that slowly crossfades between colour states
-function AnimatedGradientBackground({ children }: { children: React.ReactNode }) {
-  const opacities = useRef(
-    GRADIENTS.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))
-  ).current;
-
-  useEffect(() => {
-    const steps: Animated.CompositeAnimation[] = [];
-    for (let i = 0; i < GRADIENTS.length; i++) {
-      const nextI = (i + 1) % GRADIENTS.length;
-      steps.push(Animated.delay(6000));
-      steps.push(
-        Animated.parallel([
-          Animated.timing(opacities[nextI], {
-            toValue: 1,
-            duration: 8000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacities[i], {
-            toValue: 0,
-            duration: 8000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-    }
-    Animated.loop(Animated.sequence(steps)).start();
-  }, []);
-
-  return (
-    <View style={StyleSheet.absoluteFill}>
-      {GRADIENTS.map((colors, i) => (
-        <Animated.View
-          key={i}
-          style={[StyleSheet.absoluteFill, { opacity: opacities[i] }]}
-        >
-          <LinearGradient
-            colors={colors as any}
-            locations={LOCATIONS}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      ))}
-      {children}
-    </View>
   );
 }
 
@@ -125,7 +61,7 @@ function PrivacyPolicyModal({ visible, onClose }: { visible: boolean; onClose: (
         <View style={ppStyles.header}>
           <Text style={ppStyles.title}>Privacy Policy</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="close" size={24} color="#333" />
+            <Ionicons name="close" size={24} color="#3db88a" />
           </TouchableOpacity>
         </View>
         <ScrollView style={ppStyles.scroll} contentContainerStyle={ppStyles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -178,7 +114,7 @@ function PrivacyPolicyModal({ visible, onClose }: { visible: boolean; onClose: (
 const ppStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#1f2e4f',
   },
   header: {
     flexDirection: 'row',
@@ -186,13 +122,13 @@ const ppStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   scroll: {
     flex: 1,
@@ -204,20 +140,21 @@ const ppStyles = StyleSheet.create({
   },
   updated: {
     fontSize: 13,
-    color: '#999',
+    color: 'rgba(255, 255, 255, 0.4)',
     marginBottom: 24,
   },
   section: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111',
-    marginTop: 20,
-    marginBottom: 6,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#3db88a',
+    marginTop: 24,
+    marginBottom: 8,
+    letterSpacing: 0.3,
   },
   body: {
     fontSize: 15,
-    lineHeight: 22,
-    color: '#444',
+    lineHeight: 23,
+    color: 'rgba(255, 255, 255, 0.75)',
   },
 });
 
@@ -231,7 +168,7 @@ export default function AuthScreen() {
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const [fontsLoaded] = useFonts({ Nunito_200ExtraLight, Nunito_300Light });
+  const [fontsLoaded] = useFonts({ Nunito_700Bold });
 
   useEffect(() => {
     (async () => {
@@ -294,10 +231,8 @@ export default function AuthScreen() {
     setLoading(false);
   };
 
-  const wordmarkFont = fontsLoaded ? 'Nunito_200ExtraLight' : undefined;
-
   return (
-    <AnimatedGradientBackground>
+    <View style={styles.container}>
       <PrivacyPolicyModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
       <KeyboardAvoidingView
         style={styles.flex}
@@ -306,7 +241,7 @@ export default function AuthScreen() {
       >
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={[styles.inner, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 32 }]}
+          contentContainerStyle={[styles.inner, { paddingTop: Math.max(insets.top, 40), paddingBottom: insets.bottom + 40 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -314,7 +249,7 @@ export default function AuthScreen() {
           {/* Brand block */}
           <View>
             <ArcLogo />
-            <Text style={[styles.wordmark, wordmarkFont ? { fontFamily: wordmarkFont } : null]}>
+            <Text style={[styles.wordmark, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>
               Blue Fitness
             </Text>
             <Text style={styles.tagline}>Log your movement. Track how you feel. Keep showing up.</Text>
@@ -325,7 +260,7 @@ export default function AuthScreen() {
             <TextInput
               style={styles.input}
               placeholder="Email"
-              placeholderTextColor="rgba(255,255,255,0.65)"
+              placeholderTextColor="rgba(255, 255, 255, 0.35)"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -335,7 +270,7 @@ export default function AuthScreen() {
             <TextInput
               style={styles.input}
               placeholder="Password"
-              placeholderTextColor="rgba(255,255,255,0.65)"
+              placeholderTextColor="rgba(255, 255, 255, 0.35)"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -394,118 +329,119 @@ export default function AuthScreen() {
                 activeOpacity={0.7}
                 style={styles.faceIdRow}
               >
-                <Ionicons name="scan-outline" size={30} color="rgba(255,255,255,0.8)" />
+                <Ionicons name="scan-outline" size={28} color="#3db88a" />
                 <Text style={styles.faceIdText}>Face ID</Text>
               </TouchableOpacity>
             )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </AnimatedGradientBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#1f2e4f',
+  },
   flex: {
     flex: 1,
   },
   inner: {
     flexGrow: 1,
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: 24,
     justifyContent: 'space-between',
   },
   wordmark: {
     fontSize: 48,
-    fontWeight: '200',
-    color: '#fff',
-    marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
-    letterSpacing: 2,
-    textShadowColor: 'rgba(0,0,0,0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginTop: 16,
+    marginBottom: 8,
+    letterSpacing: 1,
   },
   tagline: {
-    ...Typography.subheadline,
-    fontFamily: Platform.OS === 'ios' ? 'Futura-Medium' : 'sans-serif',
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 15,
+    lineHeight: 22,
+    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 48,
-    letterSpacing: 0.3,
-    textShadowColor: 'rgba(0,0,0,0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    letterSpacing: 0.2,
   },
   form: {
-    gap: Spacing.md,
+    gap: 14,
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.base,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
-    ...Typography.body,
-    color: '#fff',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    lineHeight: 21,
+    color: '#ffffff',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   button: {
-    backgroundColor: '#1A5276',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: '#f5a623',
+    borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: Spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    marginTop: 8,
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   buttonDisabled: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '400',
-    fontFamily: Platform.OS === 'ios' ? 'Futura-Medium' : 'sans-serif',
-    letterSpacing: 0.5,
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   faceIdRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.base,
+    gap: 10,
+    paddingVertical: 16,
   },
   faceIdText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 17,
-    fontFamily: Platform.OS === 'ios' ? 'Futura-Medium' : 'sans-serif',
-    letterSpacing: 0.5,
+    color: '#3db88a',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   switchRow: {
     alignItems: 'center',
-    marginTop: Spacing.sm,
+    marginTop: 12,
   },
   switchText: {
-    ...Typography.footnote,
-    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    lineHeight: 20,
   },
   switchLink: {
-    color: '#fff',
+    color: '#3db88a',
     fontWeight: '700',
   },
   privacyText: {
-    ...Typography.footnote,
-    color: 'rgba(255,255,255,0.65)',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   privacyLink: {
-    color: 'rgba(255,255,255,0.9)',
+    color: '#3db88a',
+    fontWeight: '600',
     textDecorationLine: 'underline',
   },
   privacyRow: {
     alignItems: 'center',
+    marginTop: 4,
   },
 });

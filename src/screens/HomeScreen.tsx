@@ -14,7 +14,6 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
 import { FeelingType, MealType, MovementType, WorkoutExercise } from '../types';
 import {
   createMovementSession,
@@ -33,7 +32,7 @@ import { Typography, Spacing, BorderRadius } from '../theme';
 import { supabase } from '../lib/supabase';
 import QuickLogCard from '../components/QuickLogCard';
 import { getDailyCheckIn } from '../services/anthropic';
-import { schedulePostWorkoutNotification } from '../services/notifications';
+import { schedulePostWorkoutNotification, scheduleDailyRecapNotification } from '../services/notifications';
 
 type WeatherInfo = { temp: number; iconName: string };
 
@@ -58,7 +57,7 @@ export default function HomeScreen() {
   const [profileVisible, setProfileVisible] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [coachMessage, setCoachMessage] = useState<DailyCheckInMessage | null>(null);
-  const [coachLoading, setCoachLoading] = useState(true);
+  const [coachLoading, setCoachLoading] = useState(false);
   const [coachExpanded, setCoachExpanded] = useState(false);
   const [coachFeedback, setCoachFeedback] = useState<'up' | 'down' | null>(null);
   const [sessionCount, setSessionCount] = useState(0);
@@ -92,6 +91,8 @@ export default function HomeScreen() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserEmail(user?.email ?? null);
     });
+    // Schedule daily 8PM recap notification
+    scheduleDailyRecapNotification().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -159,11 +160,6 @@ export default function HomeScreen() {
     if (key === loadKeyRef.current) setCoachLoading(false);
   }, []);
 
-  useFocusEffect(useCallback(() => {
-    loadCoachMessage();
-  }, [loadCoachMessage]));
-
-
   const handleSave = async (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[]; date: string }) => {
     const session = await createMovementSession(
       entry.type,
@@ -173,7 +169,7 @@ export default function HomeScreen() {
       entry.workoutDetails,
       entry.date
     );
-    loadCoachMessage(true);
+    // Coach check-in is now on-demand only, not auto-generated
     schedulePostWorkoutNotification(session).catch(() => {});
   };
 
@@ -276,32 +272,18 @@ export default function HomeScreen() {
           <View style={styles.coachCardContent}>
             <View style={styles.coachHeader}>
               <Text style={[styles.coachLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>✨ AI COACH · DAILY CHECK-IN</Text>
-              {coachMessage && (
-                <View style={styles.feedbackRow}>
-                  <TouchableOpacity
-                    onPress={() => setCoachFeedback(coachFeedback === 'up' ? null : 'up')}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons
-                      name={coachFeedback === 'up' ? 'thumbs-up' : 'thumbs-up-outline'}
-                      size={18}
-                      color={coachFeedback === 'up' ? ACCENT : 'rgba(255, 255, 255, 0.3)'}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setCoachFeedback(coachFeedback === 'down' ? null : 'down')}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons
-                      name={coachFeedback === 'down' ? 'thumbs-down' : 'thumbs-down-outline'}
-                      size={18}
-                      color={coachFeedback === 'down' ? ACCENT : 'rgba(255, 255, 255, 0.3)'}
-                    />
-                  </TouchableOpacity>
-                </View>
-              )}
+              <TouchableOpacity
+                onPress={() => loadCoachMessage(true)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                disabled={coachLoading}
+              >
+                <Ionicons
+                  name="refresh"
+                  size={20}
+                  color={coachLoading ? 'rgba(255, 255, 255, 0.2)' : ACCENT}
+                />
+              </TouchableOpacity>
             </View>
             {coachLoading ? (
               <View style={styles.coachMessagePlaceholder}>
@@ -327,8 +309,37 @@ export default function HomeScreen() {
                     <Text style={styles.readMore}>Read more</Text>
                   </TouchableOpacity>
                 )}
+                <View style={styles.feedbackRow}>
+                  <Text style={styles.feedbackLabel}>Was this helpful?</Text>
+                  <TouchableOpacity
+                    onPress={() => setCoachFeedback(coachFeedback === 'up' ? null : 'up')}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={coachFeedback === 'up' ? 'thumbs-up' : 'thumbs-up-outline'}
+                      size={18}
+                      color={coachFeedback === 'up' ? ACCENT : 'rgba(255, 255, 255, 0.3)'}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setCoachFeedback(coachFeedback === 'down' ? null : 'down')}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={coachFeedback === 'down' ? 'thumbs-down' : 'thumbs-down-outline'}
+                      size={18}
+                      color={coachFeedback === 'down' ? ACCENT : 'rgba(255, 255, 255, 0.3)'}
+                    />
+                  </TouchableOpacity>
+                </View>
               </>
-            ) : null}
+            ) : (
+              <View style={styles.coachEmptyState}>
+                <Text style={styles.coachEmptyText}>Tap the refresh button to get your personalized check-in</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -603,7 +614,17 @@ const styles = StyleSheet.create({
   },
   feedbackRow: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  feedbackLabel: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginRight: 4,
   },
   coachMessagePlaceholder: {
     paddingVertical: 6,
@@ -612,6 +633,15 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  coachEmptyState: {
+    paddingVertical: 12,
+  },
+  coachEmptyText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontStyle: 'italic',
   },
   // Segment control
   segmentControl: {

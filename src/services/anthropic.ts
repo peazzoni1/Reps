@@ -307,3 +307,57 @@ Respond with a valid JSON object only:
     return null;
   }
 }
+
+export async function generateDailyRecapMessage(
+  todaySnapshot?: DailySnapshot
+): Promise<{ title: string; body: string } | null> {
+  if (!API_KEY) return null;
+
+  const exerciseCount = todaySnapshot?.exercises.length ?? 0;
+  const foodCount = todaySnapshot?.food.length ?? 0;
+
+  const dataSummary = todaySnapshot
+    ? `Today's activity:
+Exercise: ${exerciseCount > 0 ? todaySnapshot.exercises.map(e => e.label).join(', ') : 'None logged'}
+Food: ${foodCount > 0 ? `${foodCount} ${foodCount === 1 ? 'entry' : 'entries'} logged` : 'None logged'}`
+    : 'No activity logged today.';
+
+  try {
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 120,
+        system: `You are a warm personal coach sending an 8PM daily recap notification. Focus on:
+- What they accomplished today (if anything)
+- Gently remind them to log anything they might have missed
+- Keep it brief, warm, and actionable
+
+${dataSummary}
+
+If they logged activity: acknowledge it warmly and remind them to log anything missing.
+If they logged nothing: gentle, non-judgmental reminder to log their day before bed.
+
+No exclamation marks. No hollow cheerleading. Be warm and specific.
+
+Respond with a valid JSON object only:
+{"title": "4-6 words", "body": "1-2 sentences max"}`,
+        messages: [{ role: 'user', content: 'Generate the daily recap notification.' }],
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const json = await response.json();
+    const raw = (json.content?.[0]?.text as string) ?? '';
+    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return JSON.parse(cleaned) as { title: string; body: string };
+  } catch {
+    return null;
+  }
+}
