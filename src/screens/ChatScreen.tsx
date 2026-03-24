@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
-  AppState,
+  DeviceEventEmitter,
 } from 'react-native';
 import { RouteProp, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -101,6 +101,26 @@ export default function ChatScreen() {
       checkInactivityTimeout();
     }, [checkInactivityTimeout])
   );
+
+  // Listen for user sign-in event and reset chat session
+  useEffect(() => {
+    const handleUserSignIn = async () => {
+      if (sessionState === 'active') {
+        const newSession = await createCoachSession();
+        setSession(newSession);
+        setMessages([]);
+        appliedInitialMessage.current = null;
+        setSessionState('active');
+        lastActivityTime.current = Date.now();
+      }
+    };
+
+    const signInListener = DeviceEventEmitter.addListener('userSignedIn', handleUserSignIn);
+
+    return () => {
+      signInListener.remove();
+    };
+  }, [sessionState]);
 
   // Initialize: load or create active session, load supporting data
   useEffect(() => {

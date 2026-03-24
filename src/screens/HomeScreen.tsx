@@ -5,8 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
   Modal,
   Alert,
 } from 'react-native';
@@ -15,10 +13,9 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FeelingType, MealType, MovementType, WorkoutExercise } from '../types';
+import { FeelingType, MovementType, WorkoutExercise } from '../types';
 import {
   createMovementSession,
-  createFoodEntry,
   getRecentDailySnapshots,
   getCachedDailyMessage,
   storeDailyMessage,
@@ -27,11 +24,18 @@ import {
   clearAllData,
   toLocalDateStr,
   DailyCheckInMessage,
+  getTodayMovementSessions,
+  getTodayFoodEntries,
+  getDailyNote,
 } from '../services/storage';
 import { getBlendedTheme } from '../constants/seasonal';
 import { Typography, Spacing, BorderRadius } from '../theme';
 import { supabase } from '../lib/supabase';
 import QuickLogCard from '../components/QuickLogCard';
+import QuickAccessTile from '../components/QuickAccessTile';
+import FoodLogModal from '../components/FoodLogModal';
+import DailyNotesModal from '../components/DailyNotesModal';
+import GoalsModal from '../components/GoalsModal';
 import { getDailyCheckIn } from '../services/anthropic';
 import { schedulePostWorkoutNotification, scheduleDailyRecapNotification } from '../services/notifications';
 
@@ -46,13 +50,6 @@ function getWeatherIconName(code: number): string {
   if (code <= 82) return 'rainy-outline';
   return 'thunderstorm-outline';
 }
-
-const MEALS: { id: MealType; label: string; icon: string; color: string }[] = [
-  { id: 'breakfast', label: 'Breakfast', icon: '☀️', color: 'rgba(255, 193, 7, 0.15)' },
-  { id: 'lunch', label: 'Lunch', icon: '🌤', color: 'rgba(255, 152, 0, 0.15)' },
-  { id: 'dinner', label: 'Dinner', icon: '🌙', color: 'rgba(103, 58, 183, 0.15)' },
-  { id: 'snack', label: 'Snack', icon: '🍎', color: 'rgba(244, 67, 54, 0.15)' },
-];
 
 // Header logo component - smaller version for the header
 function HeaderLogo() {
@@ -79,10 +76,10 @@ function HeaderLogo() {
 }
 
 type UserProfile = {
-  first_name: string;
-  last_name: string;
-  sex: 'male' | 'female' | 'other';
-  birthdate: string;
+  first_name?: string;
+  last_name?: string;
+  sex?: 'male' | 'female' | 'non-binary' | 'prefer-not-to-say';
+  birthdate?: string;
 };
 
 export default function HomeScreen() {
@@ -99,26 +96,17 @@ export default function HomeScreen() {
   const season = getBlendedTheme();
   const insets = useSafeAreaInsets();
 
-  // Toggle state
-  const [activeTab, setActiveTab] = useState<'activity' | 'food'>('activity');
+  // Modal visibility states
+  const [activityModalVisible, setActivityModalVisible] = useState(false);
+  const [foodModalVisible, setFoodModalVisible] = useState(false);
+  const [notesModalVisible, setNotesModalVisible] = useState(false);
+  const [goalsModalVisible, setGoalsModalVisible] = useState(false);
 
-  // Food card state
-  const todayStr = toLocalDateStr(new Date());
-  const yesterdayDate = new Date();
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterdayStr = toLocalDateStr(yesterdayDate);
-  const [foodDescription, setFoodDescription] = useState('');
-  const [selectedFoodMeal, setSelectedFoodMeal] = useState<MealType | null>(null);
-  const [selectedFoodDate, setSelectedFoodDate] = useState<string>(todayStr);
-  const [foodSaving, setFoodSaving] = useState(false);
-  const [showMoreFoodDates, setShowMoreFoodDates] = useState(false);
-
-  const FOOD_DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  const moreFoodDates = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (i + 2));
-    return { label: FOOD_DAY_NAMES[d.getDay()], date: toLocalDateStr(d) };
-  });
+  // Tile status states
+  const [activityStatus, setActivityStatus] = useState('No activities today');
+  const [foodStatus, setFoodStatus] = useState('No meals logged');
+  const [notesStatus, setNotesStatus] = useState('No notes yet');
+  const [goalsStatus, setGoalsStatus] = useState('Coming soon');
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -139,6 +127,47 @@ export default function HomeScreen() {
     });
     // Schedule daily 8PM recap notification
     scheduleDailyRecapNotification().catch(() => {});
+    // Load tile statuses
+    loadStatuses();
+  }, []);
+
+  const loadStatuses = useCallback(async () => {
+    try {
+      const [activitySessions, foodEntries, dailyNote] = await Promise.all([
+        getTodayMovementSessions(),
+        getTodayFoodEntries(),
+        getDailyNote(toLocalDateStr(new Date())),
+      ]);
+
+      // Activity status
+      const activityCount = activitySessions.length;
+      if (activityCount === 0) {
+        setActivityStatus('No activities today');
+      } else if (activityCount === 1) {
+        setActivityStatus('1 activity today');
+      } else {
+        setActivityStatus(`${activityCount} activities today`);
+      }
+
+      // Food status
+      const foodCount = foodEntries.length;
+      if (foodCount === 0) {
+        setFoodStatus('No meals logged');
+      } else if (foodCount === 1) {
+        setFoodStatus('1 meal logged');
+      } else {
+        setFoodStatus(`${foodCount} meals logged`);
+      }
+
+      // Notes status
+      if (dailyNote && dailyNote.content.trim()) {
+        setNotesStatus('Note saved');
+      } else {
+        setNotesStatus('No notes yet');
+      }
+    } catch (error) {
+      console.error('Error loading statuses:', error);
+    }
   }, []);
 
   useEffect(() => {
@@ -217,18 +246,8 @@ export default function HomeScreen() {
     );
     // Coach check-in is now on-demand only, not auto-generated
     schedulePostWorkoutNotification(session).catch(() => {});
-  };
-
-  const handleSaveFood = async () => {
-    const desc = foodDescription.trim();
-    if (!desc) return;
-    setFoodSaving(true);
-    await createFoodEntry(desc, selectedFoodMeal ?? undefined, selectedFoodDate);
-    setFoodSaving(false);
-    setFoodDescription('');
-    setSelectedFoodMeal(null);
-    setSelectedFoodDate(todayStr);
-    setShowMoreFoodDates(false);
+    // Refresh activity status
+    loadStatuses();
   };
 
   const handleLogout = async () => {
@@ -285,17 +304,32 @@ export default function HomeScreen() {
   };
 
   const getInitials = (): string => {
-    // Use first and last name from profile if available
+    // Use first and last name from profile if both are available
     if (userProfile?.first_name && userProfile?.last_name) {
       return (userProfile.first_name[0] + userProfile.last_name[0]).toUpperCase();
     }
-    // Fallback to email parsing if profile not loaded yet
+
+    // If only first name is available, use first two letters
+    if (userProfile?.first_name) {
+      const name = userProfile.first_name;
+      if (name.length >= 2) {
+        return (name[0] + name[1]).toUpperCase();
+      }
+      return name[0].toUpperCase();
+    }
+
+    // If only last name is available, use first two letters
+    if (userProfile?.last_name) {
+      const name = userProfile.last_name;
+      if (name.length >= 2) {
+        return (name[0] + name[1]).toUpperCase();
+      }
+      return name[0].toUpperCase();
+    }
+
+    // Fallback to email parsing if no name provided
     if (!userEmail) return '?';
     const username = userEmail.split('@')[0];
-    const parts = username.split(/[._-]/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
     if (username.length >= 2) {
       return (username[0] + username[1]).toUpperCase();
     }
@@ -413,120 +447,37 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Activity / Food toggle */}
-        <View style={styles.segmentControl}>
-          <TouchableOpacity
-            style={[styles.segment, activeTab === 'activity' && styles.segmentActive]}
-            onPress={() => setActiveTab('activity')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.segmentText, activeTab === 'activity' && styles.segmentTextActive]}>Activity</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segment, activeTab === 'food' && styles.segmentActive]}
-            onPress={() => setActiveTab('food')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.segmentText, activeTab === 'food' && styles.segmentTextActive]}>Food</Text>
-          </TouchableOpacity>
+        {/* Quick Access Tiles */}
+        <View style={styles.tileGrid}>
+          <QuickAccessTile
+            icon="⚡"
+            label="Activity"
+            status={activityStatus}
+            color="#3db88a"
+            onPress={() => setActivityModalVisible(true)}
+          />
+          <QuickAccessTile
+            icon="🍽️"
+            label="Food"
+            status={foodStatus}
+            color="#f5a623"
+            onPress={() => setFoodModalVisible(true)}
+          />
+          <QuickAccessTile
+            icon="✍️"
+            label="Notes"
+            status={notesStatus}
+            color="#7ab8c8"
+            onPress={() => setNotesModalVisible(true)}
+          />
+          <QuickAccessTile
+            icon="🎯"
+            label="Goals"
+            status={goalsStatus}
+            color="#8fbc8f"
+            onPress={() => setGoalsModalVisible(true)}
+          />
         </View>
-
-        {/* Quick log card */}
-        {activeTab === 'activity' && (
-          <QuickLogCard season={{ ...season, color: '#3db88a', accent: '#7ab8c8', cardBg: 'rgba(255, 255, 255, 0.06)', textSecondary: 'rgba(255, 255, 255, 0.55)' }} onSave={handleSave} />
-        )}
-
-        {/* Food log card */}
-        {activeTab === 'food' && (
-          <View style={styles.foodCard}>
-            <Text style={styles.foodCardHeader}>🍽️ LOG FOOD</Text>
-
-            <View style={styles.foodPillRow}>
-              {MEALS.map(meal => (
-                <TouchableOpacity
-                  key={meal.id}
-                  style={[
-                    styles.foodPill,
-                    selectedFoodMeal === meal.id && styles.foodPillActive,
-                    { backgroundColor: selectedFoodMeal === meal.id ? meal.color : 'transparent' }
-                  ]}
-                  onPress={() => setSelectedFoodMeal(prev => prev === meal.id ? null : meal.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.foodPillIcon}>{meal.icon}</Text>
-                  <Text style={[styles.foodPillText, selectedFoodMeal === meal.id && styles.foodPillTextActive]}>
-                    {meal.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={[styles.foodPillRow, { marginTop: 4, marginBottom: showMoreFoodDates ? 4 : 0 }]}>
-              {[{ label: 'Today', date: todayStr }, { label: 'Yesterday', date: yesterdayStr }].map(({ label, date }) => (
-                <TouchableOpacity
-                  key={date}
-                  style={[styles.foodPill, selectedFoodDate === date && styles.foodPillActive]}
-                  onPress={() => setSelectedFoodDate(date)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.foodPillText, selectedFoodDate === date && styles.foodPillTextActive]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                onPress={() => setShowMoreFoodDates(v => !v)}
-                style={[styles.foodPill, { borderStyle: 'dashed' }]}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.foodPillText, { opacity: 0.6 }]}>
-                  {showMoreFoodDates ? 'Less' : 'More'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {showMoreFoodDates && (
-              <View style={styles.foodPillRow}>
-                {moreFoodDates.map(({ label, date }) => (
-                  <TouchableOpacity
-                    key={date}
-                    style={[styles.foodPill, selectedFoodDate === date && styles.foodPillActive]}
-                    onPress={() => setSelectedFoodDate(date)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.foodPillText, selectedFoodDate === date && styles.foodPillTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            <TextInput
-              style={styles.foodInput}
-              value={foodDescription}
-              onChangeText={setFoodDescription}
-              placeholder="What did you eat?"
-              placeholderTextColor="rgba(255, 255, 255, 0.3)"
-              multiline
-              maxLength={300}
-            />
-
-            {foodDescription.trim().length > 0 && (
-              <TouchableOpacity
-                style={[styles.foodSaveBtn, foodSaving && styles.foodSaveBtnDisabled]}
-                onPress={handleSaveFood}
-                disabled={foodSaving}
-                activeOpacity={0.8}
-              >
-                {foodSaving ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.foodSaveBtnText}>Save</Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
 
       </ScrollView>
 
@@ -547,9 +498,9 @@ export default function HomeScreen() {
             </View>
 
             {/* Name */}
-            {userProfile && (
+            {userProfile && (userProfile.first_name || userProfile.last_name) && (
               <Text style={styles.userName}>
-                {userProfile.first_name} {userProfile.last_name}
+                {[userProfile.first_name, userProfile.last_name].filter(Boolean).join(' ')}
               </Text>
             )}
 
@@ -559,24 +510,32 @@ export default function HomeScreen() {
             )}
 
             {/* Profile Details */}
-            {userProfile && (
+            {userProfile && (userProfile.sex || userProfile.birthdate) && (
               <View style={styles.profileDetails}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Sex</Text>
-                  <Text style={styles.detailValue}>
-                    {userProfile.sex.charAt(0).toUpperCase() + userProfile.sex.slice(1)}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Birthdate</Text>
-                  <Text style={styles.detailValue}>
-                    {new Date(userProfile.birthdate).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </Text>
-                </View>
+                {userProfile.sex && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Sex</Text>
+                    <Text style={styles.detailValue}>
+                      {userProfile.sex === 'prefer-not-to-say'
+                        ? 'Prefer not to say'
+                        : userProfile.sex === 'non-binary'
+                        ? 'Non-binary'
+                        : userProfile.sex.charAt(0).toUpperCase() + userProfile.sex.slice(1)}
+                    </Text>
+                  </View>
+                )}
+                {userProfile.birthdate && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Birthdate</Text>
+                    <Text style={styles.detailValue}>
+                      {new Date(userProfile.birthdate).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -592,6 +551,55 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Activity Modal */}
+      <Modal visible={activityModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setActivityModalVisible(false)}
+          />
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
+            <View style={styles.modalHandle} />
+            <QuickLogCard
+              season={{ ...season, color: '#3db88a', accent: '#7ab8c8', cardBg: 'rgba(255, 255, 255, 0.06)', textSecondary: 'rgba(255, 255, 255, 0.55)' }}
+              onSave={(entry) => {
+                handleSave(entry);
+                setActivityModalVisible(false);
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Food Modal */}
+      <FoodLogModal
+        visible={foodModalVisible}
+        onClose={() => setFoodModalVisible(false)}
+        onSave={() => {
+          setFoodModalVisible(false);
+          loadStatuses();
+        }}
+        season={season}
+      />
+
+      {/* Daily Notes Modal */}
+      <DailyNotesModal
+        visible={notesModalVisible}
+        onClose={() => setNotesModalVisible(false)}
+        onSave={() => {
+          loadStatuses();
+        }}
+        season={season}
+      />
+
+      {/* Goals Modal */}
+      <GoalsModal
+        visible={goalsModalVisible}
+        onClose={() => setGoalsModalVisible(false)}
+        season={season}
+      />
     </View>
   );
 }
@@ -755,39 +763,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontStyle: 'italic',
   },
-  // Segment control
-  segmentControl: {
+  // Tile grid
+  tileGrid: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: BorderRadius.pill,
-    padding: 4,
+    flexWrap: 'wrap',
+    gap: 12,
     marginBottom: 20,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  segment: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.pill,
-    alignItems: 'center',
-  },
-  segmentActive: {
-    backgroundColor: '#3db88a',
-    shadowColor: '#3db88a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  segmentText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.5)',
-    letterSpacing: 0.3,
-  },
-  segmentTextActive: {
-    color: '#ffffff',
-    fontWeight: '700',
   },
   // Food card
   foodCard: {

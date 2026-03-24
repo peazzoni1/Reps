@@ -413,6 +413,53 @@ export const incrementDailyCoachMessageCount = async (): Promise<number> => {
   }
 };
 
+// Daily Notes
+const DAILY_NOTES_PREFIX = '@reps_daily_notes_';
+
+export interface DailyNote {
+  date: string;        // YYYY-MM-DD
+  content: string;
+  updatedAt: string;   // ISO timestamp
+}
+
+export const getDailyNote = async (date: string): Promise<DailyNote | null> => {
+  try {
+    const key = `${DAILY_NOTES_PREFIX}${date}`;
+    const data = await AsyncStorage.getItem(key);
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.error('Error reading daily note:', error);
+    return null;
+  }
+};
+
+export const saveDailyNote = async (date: string, content: string): Promise<void> => {
+  try {
+    const key = `${DAILY_NOTES_PREFIX}${date}`;
+    const note: DailyNote = {
+      date,
+      content,
+      updatedAt: new Date().toISOString(),
+    };
+    await AsyncStorage.setItem(key, JSON.stringify(note));
+  } catch (error) {
+    console.error('Error saving daily note:', error);
+  }
+};
+
+// Helper functions for tile status
+export const getTodayMovementSessions = async (): Promise<MovementSession[]> => {
+  const sessions = await getAllMovementSessions();
+  const todayStr = toLocalDateStr(new Date());
+  return sessions.filter(s => toLocalDateStr(new Date(s.date)) === todayStr);
+};
+
+export const getTodayFoodEntries = async (): Promise<FoodEntry[]> => {
+  const entries = await getAllFoodEntries();
+  const todayStr = toLocalDateStr(new Date());
+  return entries.filter(e => toLocalDateStr(new Date(e.date)) === todayStr);
+};
+
 // Utility: clear all data
 export const clearAllData = async (): Promise<void> => {
   await AsyncStorage.multiRemove([

@@ -21,7 +21,7 @@ import { Spacing } from '../theme';
 export default function AccountDetailsScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [sex, setSex] = useState<'male' | 'female' | 'other' | null>(null);
+  const [sex, setSex] = useState<'male' | 'female' | 'non-binary' | 'prefer-not-to-say' | null>(null);
   const [birthdate, setBirthdate] = useState('');
   const [saving, setSaving] = useState(false);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
@@ -41,12 +41,8 @@ export default function AccountDetailsScreen() {
   };
 
   const handleSave = async () => {
-    if (!firstName.trim() || !lastName.trim() || !sex || !birthdate.trim()) {
-      Alert.alert('Missing Information', 'Please fill in all fields.');
-      return;
-    }
-
-    if (!validateDate(birthdate)) {
+    // Validate birthdate format if provided
+    if (birthdate.trim() && !validateDate(birthdate)) {
       Alert.alert('Invalid Date', 'Please enter a valid date in MM/DD/YYYY format.');
       return;
     }
@@ -57,13 +53,17 @@ export default function AccountDetailsScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      const { error } = await supabase.from('user_profiles').upsert({
+      // Build profile data with only provided fields
+      const profileData: any = {
         user_id: user.id,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        sex: sex,
-        birthdate: formatDateForDb(birthdate),
-      });
+      };
+
+      if (firstName.trim()) profileData.first_name = firstName.trim();
+      if (lastName.trim()) profileData.last_name = lastName.trim();
+      if (sex) profileData.sex = sex;
+      if (birthdate.trim()) profileData.birthdate = formatDateForDb(birthdate);
+
+      const { error } = await supabase.from('user_profiles').upsert(profileData);
 
       if (error) throw error;
 
@@ -91,7 +91,7 @@ export default function AccountDetailsScreen() {
     setBirthdate(cleaned);
   };
 
-  const isFormValid = firstName.trim() && lastName.trim() && sex && birthdate.trim() && validateDate(birthdate);
+  const isFormValid = !birthdate.trim() || validateDate(birthdate);
 
   return (
     <LinearGradient
@@ -121,14 +121,14 @@ export default function AccountDetailsScreen() {
               Complete Your Profile
             </Text>
             <Text style={styles.subtitle}>
-              Tell us a bit about yourself to personalize your experience.
+              Tell us a bit about yourself to personalize your experience. All fields are optional.
             </Text>
           </View>
 
           <View style={styles.form}>
             <TextInput
               style={[styles.input, firstNameFocused && styles.inputFocused]}
-              placeholder="First Name"
+              placeholder="First Name (Optional)"
               placeholderTextColor="rgba(255, 255, 255, 0.35)"
               value={firstName}
               onChangeText={setFirstName}
@@ -140,7 +140,7 @@ export default function AccountDetailsScreen() {
 
             <TextInput
               style={[styles.input, lastNameFocused && styles.inputFocused]}
-              placeholder="Last Name"
+              placeholder="Last Name (Optional)"
               placeholderTextColor="rgba(255, 255, 255, 0.35)"
               value={lastName}
               onChangeText={setLastName}
@@ -151,31 +151,39 @@ export default function AccountDetailsScreen() {
             />
 
             <View style={styles.section}>
-              <Text style={styles.label}>Sex</Text>
+              <Text style={styles.label}>Sex (Optional)</Text>
               <View style={styles.optionRow}>
-                {(['male', 'female', 'other'] as const).map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.option,
-                      sex === option && styles.optionActive,
-                    ]}
-                    onPress={() => setSex(option)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[
-                      styles.optionText,
-                      sex === option && styles.optionTextActive,
-                    ]}>
-                      {option.charAt(0).toUpperCase() + option.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {(['male', 'female', 'non-binary', 'prefer-not-to-say'] as const).map((option) => {
+                  const label = option === 'prefer-not-to-say'
+                    ? 'Prefer not to say'
+                    : option === 'non-binary'
+                    ? 'Non-binary'
+                    : option.charAt(0).toUpperCase() + option.slice(1);
+
+                  return (
+                    <TouchableOpacity
+                      key={option}
+                      style={[
+                        styles.option,
+                        sex === option && styles.optionActive,
+                      ]}
+                      onPress={() => setSex(option)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        styles.optionText,
+                        sex === option && styles.optionTextActive,
+                      ]} numberOfLines={1} adjustsFontSizeToFit>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.label}>Birthdate</Text>
+              <Text style={styles.label}>Birthdate (Optional)</Text>
               <TextInput
                 style={[styles.input, birthdateFocused && styles.inputFocused]}
                 placeholder="MM/DD/YYYY"
@@ -272,12 +280,14 @@ const styles = StyleSheet.create({
   },
   optionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   option: {
     flex: 1,
+    minWidth: '45%',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 0.5,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -289,9 +299,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(61, 184, 138, 0.15)',
   },
   optionText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
   },
   optionTextActive: {
     color: '#3db88a',

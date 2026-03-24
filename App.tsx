@@ -53,6 +53,8 @@ export default function App() {
           syncFromSupabase(session.user.id),
           checkUserProfile(session.user.id),
         ]);
+        // Emit event to reset chat session on fresh login
+        DeviceEventEmitter.emit('userSignedIn');
       }
     });
 
