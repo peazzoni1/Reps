@@ -306,21 +306,30 @@ export default function TrackingScreen() {
     </TouchableOpacity>
   );
 
-  const renderDay = (snapshot: DailySnapshot) => {
-    const dayNote = dailyNotes.find(n => n.date === snapshot.date);
+  // Merge snapshots and notes to get all dates
+  const getAllDates = (): string[] => {
+    const dateSet = new Set<string>();
+    snapshots.forEach(s => dateSet.add(s.date));
+    dailyNotes.forEach(n => dateSet.add(n.date));
+    return Array.from(dateSet).sort((a, b) => b.localeCompare(a)); // Most recent first
+  };
+
+  const renderDay = (date: string) => {
+    const snapshot = snapshots.find(s => s.date === date);
+    const dayNote = dailyNotes.find(n => n.date === date);
 
     return (
-      <View key={snapshot.date} style={styles.daySection}>
-        <Text style={styles.dayHeading}>{formatDateHeading(snapshot.date)}</Text>
+      <View key={date} style={styles.daySection}>
+        <Text style={styles.dayHeading}>{formatDateHeading(date)}</Text>
 
-        {snapshot.exercises.length > 0 && (
+        {snapshot && snapshot.exercises.length > 0 && (
           <View style={styles.categoryBlock}>
             <Text style={styles.categoryLabel}>EXERCISE</Text>
             {snapshot.exercises.map(renderExerciseItem)}
           </View>
         )}
 
-        {snapshot.food.length > 0 && (
+        {snapshot && snapshot.food.length > 0 && (
           <View style={styles.categoryBlock}>
             <Text style={styles.categoryLabel}>FOOD</Text>
             {snapshot.food.map(renderFoodItem)}
@@ -349,11 +358,11 @@ export default function TrackingScreen() {
         <View style={styles.center}>
           <ActivityIndicator color="#3db88a" />
         </View>
-      ) : snapshots.length === 0 ? (
+      ) : snapshots.length === 0 && dailyNotes.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>Nothing logged yet</Text>
           <Text style={styles.emptySubtitle}>
-            Log activity or food on the Today tab to see it here.
+            Log activity, food, or notes on the Today tab to see them here.
           </Text>
         </View>
       ) : (
@@ -361,7 +370,7 @@ export default function TrackingScreen() {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing.xxl }]}
           showsVerticalScrollIndicator={false}
         >
-          {snapshots.map(renderDay)}
+          {getAllDates().map(renderDay)}
         </ScrollView>
       )}
 

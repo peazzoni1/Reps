@@ -27,6 +27,7 @@ import {
   getTodayMovementSessions,
   getTodayFoodEntries,
   getDailyNote,
+  getAllDailyNotes,
 } from '../services/storage';
 import { getBlendedTheme } from '../constants/seasonal';
 import { Typography, Spacing, BorderRadius } from '../theme';
@@ -201,9 +202,10 @@ export default function HomeScreen() {
       setCoachMessage(null);
     }
 
-    const [cached, recentData, previousMessages] = await Promise.all([
+    const [cached, recentData, dailyNotes, previousMessages] = await Promise.all([
       getCachedDailyMessage(),
       getRecentDailySnapshots(10),
+      getAllDailyNotes(),
       getPreviousDailyMessages(),
     ]);
 
@@ -220,7 +222,7 @@ export default function HomeScreen() {
 
     setCoachLoading(true);
     try {
-      const message = await getDailyCheckIn(recentData, previousMessages);
+      const message = await getDailyCheckIn(recentData, dailyNotes, previousMessages);
       if (key !== loadKeyRef.current) return;
       if (message) {
         const entry: DailyCheckInMessage = {
@@ -560,7 +562,7 @@ export default function HomeScreen() {
             activeOpacity={1}
             onPress={() => setActivityModalVisible(false)}
           />
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
+          <View style={[styles.activityModalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalHeaderTitle}>Log Activity</Text>
@@ -572,13 +574,20 @@ export default function HomeScreen() {
                 <Ionicons name="close" size={24} color="rgba(255, 255, 255, 0.7)" />
               </TouchableOpacity>
             </View>
-            <QuickLogCard
-              season={{ ...season, color: '#3db88a', accent: '#7ab8c8', cardBg: 'rgba(255, 255, 255, 0.06)', textSecondary: 'rgba(255, 255, 255, 0.55)' }}
-              onSave={(entry) => {
-                handleSave(entry);
-                setActivityModalVisible(false);
-              }}
-            />
+            <ScrollView
+              style={styles.activityModalContent}
+              contentContainerStyle={styles.activityModalContentContainer}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <QuickLogCard
+                season={{ ...season, color: '#3db88a', accent: '#7ab8c8', cardBg: 'rgba(255, 255, 255, 0.06)', textSecondary: 'rgba(255, 255, 255, 0.55)' }}
+                onSave={(entry) => {
+                  handleSave(entry);
+                  setActivityModalVisible(false);
+                }}
+              />
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -994,5 +1003,23 @@ const styles = StyleSheet.create({
   },
   modalCloseButton: {
     padding: Spacing.xs,
+  },
+  activityModalSheet: {
+    backgroundColor: '#1f2e4f',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    paddingHorizontal: 24,
+    maxHeight: '92%',
+    borderTopWidth: 0.5,
+    borderLeftWidth: 0.5,
+    borderRightWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  activityModalContent: {
+    maxHeight: 600,
+  },
+  activityModalContentContainer: {
+    paddingBottom: Spacing.md,
   },
 });

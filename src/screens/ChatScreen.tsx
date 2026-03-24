@@ -27,6 +27,8 @@ import {
   getSessionMemorySummaries,
   getDailyCoachMessageCount,
   incrementDailyCoachMessageCount,
+  getAllDailyNotes,
+  DailyNote,
 } from '../services/storage';
 import { sendChatMessage, generateSessionSummary } from '../services/anthropic';
 import { Typography, Spacing, BorderRadius } from '../theme';
@@ -66,6 +68,7 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [recentData, setRecentData] = useState<DailySnapshot[]>([]);
+  const [dailyNotes, setDailyNotes] = useState<DailyNote[]>([]);
   const [memorySummaries, setMemorySummaries] = useState<{ date: string; bullets: MemoryBullet[] }[]>([]);
   const [pastSessionsVisible, setPastSessionsVisible] = useState(false);
   const [archivedSessions, setArchivedSessions] = useState<CoachSession[]>([]);
@@ -126,16 +129,18 @@ export default function ChatScreen() {
   // Initialize: load or create active session, load supporting data
   useEffect(() => {
     const init = async () => {
-      const [active, archived, memories, recent, count] = await Promise.all([
+      const [active, archived, memories, recent, notes, count] = await Promise.all([
         getActiveCoachSession(),
         getArchivedCoachSessions(),
         getSessionMemorySummaries(),
         getRecentDailySnapshots(10),
+        getAllDailyNotes(),
         getDailyCoachMessageCount(),
       ]);
       setDailyCount(count);
 
       setRecentData(recent);
+      setDailyNotes(notes);
       setArchivedSessions(archived);
       setMemorySummaries(memories);
 
@@ -242,7 +247,7 @@ export default function ChatScreen() {
 
     try {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
-      const reply = await sendChatMessage(text, history, recentData, memorySummaries);
+      const reply = await sendChatMessage(text, history, recentData, dailyNotes, memorySummaries);
 
       const assistantMessage: ChatMessage = {
         id: generateId(),

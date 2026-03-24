@@ -1,4 +1,5 @@
 import { DailySnapshot, MemoryBullet, MovementSession } from '../types';
+import { DailyNote } from './storage';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-haiku-4-5-20251001';
@@ -13,7 +14,7 @@ function todayDateStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function buildSystemPrompt(data: DailySnapshot[], memorySummaries: MemorySummary[] = []): string {
+function buildSystemPrompt(data: DailySnapshot[], dailyNotes: DailyNote[] = [], memorySummaries: MemorySummary[] = []): string {
   const dataSection =
     data.length === 0
       ? 'No exercise or food data has been logged yet.'
@@ -38,7 +39,10 @@ function buildSystemPrompt(data: DailySnapshot[], memorySummaries: MemorySummary
                     .map((f) => `  - ${f.meal ? `[${f.meal}] ` : ''}${f.description}`)
                     .join('\n');
 
-            return `Date: ${day.date}\nExercise:\n${exerciseLines}\nFood:\n${foodLines}`;
+            const dayNote = dailyNotes.find(n => n.date === day.date);
+            const notesLine = dayNote ? `Notes:\n  "${dayNote.content}"` : '';
+
+            return `Date: ${day.date}\nExercise:\n${exerciseLines}\nFood:\n${foodLines}${notesLine ? `\n${notesLine}` : ''}`;
           })
           .join('\n\n');
 
@@ -60,8 +64,15 @@ ${memorySection}
 Tone and approach:
 - Be kind, encouraging, and genuinely curious about how the user is doing. This is a conversation, not an assessment.
 - Give responses grounded in what's actually logged. Be specific and conversational — this is a chat, not a report.
-- When you notice something worth mentioning — a pattern, a gap, a hard week — frame it with care and curiosity, not criticism. Lead with understanding before offering suggestions.
+- When you notice something worth mentioning — a pattern, a gap, a hard week, or meaningful daily notes — frame it with care and curiosity, not criticism. Lead with understanding before offering suggestions.
+- Daily notes reveal the user's mental and emotional state — honor that context when it's relevant to the conversation.
 - Tie general questions back to their data when it's relevant. If nothing is logged yet, help them figure out where to start in a low-pressure way.
+
+Scope and boundaries:
+- You're a fitness and wellness coach. Stay focused on: exercise, nutrition, recovery, sleep, stress management, mental health as it relates to fitness, habit building, and general wellness.
+- Gray areas that connect to fitness are fine: weather (affects outdoor training), energy levels, mood, life stress (impacts training), injury prevention, gear and apparel.
+- If someone asks something clearly unrelated to fitness/wellness (current events, math problems, general knowledge, coding help, etc.), gently redirect: "I'm here to help with your fitness and wellness journey. Is there something about your training, nutrition, or how you're feeling that I can help with?"
+- Don't be robotic about it — if someone shares something personal that led to missing workouts (work stress, family situation), acknowledge it with empathy before guiding back to how you can support their fitness goals.
 
 Safety guidelines:
 - Don't recommend extreme calorie restriction, fasting, or anything that could encourage under-eating. If it looks like they're under-eating, address it gently and steer toward balance.
@@ -117,6 +128,7 @@ type PreviousMessage = { date: string; headline: string; body: string };
 
 export async function getDailyCheckIn(
   recentData: DailySnapshot[],
+  dailyNotes: DailyNote[] = [],
   previousMessages: PreviousMessage[] = []
 ): Promise<{ headline: string; body: string }> {
   if (!API_KEY) throw new Error('EXPO_PUBLIC_ANTHROPIC_API_KEY is not set.');
@@ -141,7 +153,9 @@ export async function getDailyCheckIn(
               day.food.length === 0
                 ? '  No food logged.'
                 : day.food.map((f) => `  - ${f.meal ? `[${f.meal}] ` : ''}${f.description}`).join('\n');
-            return `Date: ${day.date}\nExercise:\n${exercises}\nFood:\n${food}`;
+            const dayNote = dailyNotes.find(n => n.date === day.date);
+            const notes = dayNote ? `Notes:\n  "${dayNote.content}"` : '';
+            return `Date: ${day.date}\nExercise:\n${exercises}\nFood:\n${food}${notes ? `\n${notes}` : ''}`;
           })
           .join('\n\n');
 
@@ -191,7 +205,7 @@ ${previousContext}
 How to write this:
 - Lead with the most meaningful observation from the data — frame it with curiosity and care, not criticism.
 - When you notice patterns — a tough stretch, back-to-back sessions, low energy — acknowledge them with empathy before offering perspective.
-- When feelings and training data intersect in an interesting way, point it out gently. Skip it if there's nothing meaningful there.
+- When feelings, daily notes, and training data intersect in an interesting way, point it out gently. The notes often reveal mental/emotional state — honor that.
 - Every 3–4 days, end with a warm, open-ended question about something specific in the data — something worth reflecting on.
 - Write with continuity — reference recent days naturally, like someone who genuinely cares and has been paying attention.
 - No filler, no hollow cheerleading, no exclamation marks. Avoid "great job", "keep it up", "you've got this". Be warm and real, not performative.
@@ -231,6 +245,7 @@ export async function sendChatMessage(
   userMessage: string,
   history: ConversationMessage[],
   recentData: DailySnapshot[],
+  dailyNotes: DailyNote[] = [],
   memorySummaries: MemorySummary[] = []
 ): Promise<string> {
   if (!API_KEY) {
@@ -252,7 +267,7 @@ export async function sendChatMessage(
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 1024,
-      system: buildSystemPrompt(recentData, memorySummaries),
+      system: buildSystemPrompt(recentData, dailyNotes, memorySummaries),
       messages,
     }),
   });
