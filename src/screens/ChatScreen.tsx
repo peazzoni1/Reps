@@ -28,12 +28,12 @@ import {
   incrementDailyCoachMessageCount,
 } from '../services/storage';
 import { sendChatMessage, generateSessionSummary } from '../services/anthropic';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme';
+import { Typography, Spacing, BorderRadius } from '../theme';
 import { TabParamList } from '../navigation/TabNavigator';
 
 const SESSION_MESSAGE_LIMIT = 5;
 const DAILY_MESSAGE_LIMIT = 10;
-const ACCENT = '#3d7a8a';
+const ACCENT = '#3db88a';
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -294,7 +294,7 @@ export default function ChatScreen() {
             <Text style={styles.avatarText}>AI</Text>
           </View>
           <View style={[styles.bubble, styles.bubbleAI, styles.typingBubble]}>
-            <ActivityIndicator size="small" color={Colors.textSecondary} />
+            <ActivityIndicator size="small" color="rgba(255, 255, 255, 0.6)" />
           </View>
         </View>
       );
@@ -345,7 +345,7 @@ export default function ChatScreen() {
           <Ionicons
             name={isExpanded ? 'chevron-up' : 'chevron-forward'}
             size={16}
-            color={Colors.textSecondary}
+            color="rgba(255, 255, 255, 0.6)"
           />
         </TouchableOpacity>
         {isExpanded && (
@@ -438,7 +438,7 @@ export default function ChatScreen() {
             <Text style={styles.avatarText}>AI</Text>
           </View>
           <View style={[styles.bubble, styles.bubbleAI, styles.typingBubble]}>
-            <ActivityIndicator size="small" color={Colors.textSecondary} />
+            <ActivityIndicator size="small" color="rgba(255, 255, 255, 0.6)" />
           </View>
         </View>
       )}
@@ -462,7 +462,7 @@ export default function ChatScreen() {
                 ? 'Start a fresh session to continue…'
                 : 'Message your coach...'
             }
-            placeholderTextColor={Colors.textTertiary}
+            placeholderTextColor="rgba(255, 255, 255, 0.3)"
             multiline
             maxLength={1000}
             returnKeyType="default"
@@ -499,7 +499,7 @@ export default function ChatScreen() {
                 onPress={() => setPastSessionsVisible(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close" size={20} color={Colors.textSecondary} />
+                <Ionicons name="close" size={20} color="rgba(255, 255, 255, 0.6)" />
               </TouchableOpacity>
             </View>
 
@@ -529,15 +529,15 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#1f2e4f',
   },
   // ─── Header ──────────────────────────────────────────────────────────────
   header: {
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: 'rgba(31, 46, 79, 0.97)',
     borderBottomWidth: 0.5,
-    borderBottomColor: Colors.separator,
+    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
   },
   headerRow: {
     flexDirection: 'row',
@@ -546,16 +546,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...Typography.headline,
-    color: Colors.textPrimary,
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '700',
   },
   headerSubtitle: {
     ...Typography.caption1,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.6)',
     marginTop: 2,
   },
   headerSubtitleLink: {
     color: ACCENT,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   // ─── Message list ─────────────────────────────────────────────────────────
   listContent: {
@@ -582,7 +584,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: BorderRadius.round,
-    backgroundColor: Colors.accent,
+    backgroundColor: ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -596,15 +598,21 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    ...Shadows.sm,
+    shadowColor: '#3db88a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   bubbleUser: {
-    backgroundColor: Colors.accent,
+    backgroundColor: ACCENT,
     borderBottomRightRadius: 4,
   },
   bubbleAI: {
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderBottomLeftRadius: 4,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   bubbleText: {
     ...Typography.body,
@@ -614,7 +622,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   bubbleTextAI: {
-    color: Colors.textPrimary,
+    color: '#ffffff',
   },
   // ─── Typing / loading indicators ─────────────────────────────────────────
   typingRow: {
@@ -656,19 +664,21 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing.base,
     paddingTop: Spacing.sm,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: 'rgba(31, 46, 79, 0.97)',
     borderTopWidth: 0.5,
-    borderTopColor: Colors.separator,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
   },
   input: {
     flex: 1,
     ...Typography.body,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.lg,
+    color: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     maxHeight: 120,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   inputDisabled: {
     opacity: 0.5,
@@ -677,13 +687,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: BorderRadius.round,
-    backgroundColor: Colors.accent,
+    backgroundColor: ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 1,
   },
   sendButtonDisabled: {
-    backgroundColor: Colors.separator,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   sendButtonText: {
     fontSize: 18,
@@ -695,20 +705,20 @@ const styles = StyleSheet.create({
   limitBar: {
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.md,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: 'rgba(31, 46, 79, 0.97)',
     borderTopWidth: 0.5,
-    borderTopColor: Colors.separator,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     gap: 4,
   },
   limitTitle: {
     ...Typography.subheadline,
-    color: Colors.textPrimary,
+    color: '#ffffff',
     fontWeight: '600',
   },
   limitSubtitle: {
     ...Typography.footnote,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -720,12 +730,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     ...Typography.title3,
-    color: Colors.textPrimary,
+    color: '#ffffff',
     textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '700',
   },
   emptySubtitle: {
     ...Typography.subheadline,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -735,17 +747,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   suggestion: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: BorderRadius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 14,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.separator,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   suggestionText: {
     ...Typography.subheadline,
-    color: Colors.accent,
+    color: ACCENT,
     textAlign: 'center',
+    fontWeight: '600',
   },
   // ─── Past conversations modal ─────────────────────────────────────────────
   modalOverlay: {
@@ -754,24 +767,28 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.overlay,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalSheet: {
-    backgroundColor: Colors.cardBackground,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#1f2e4f',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingTop: Spacing.md,
     paddingHorizontal: Spacing.xl,
     maxHeight: '80%',
     // flex required so sessionList (flex: 1) has a defined-height parent
     flex: 1,
     justifyContent: 'flex-start',
+    borderTopWidth: 0.5,
+    borderLeftWidth: 0.5,
+    borderRightWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   modalHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.separator,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignSelf: 'center',
     marginBottom: Spacing.md,
   },
@@ -783,7 +800,9 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...Typography.headline,
-    color: Colors.textPrimary,
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '700',
   },
   modalEmpty: {
     paddingVertical: Spacing.xxl,
@@ -792,12 +811,12 @@ const styles = StyleSheet.create({
   },
   modalEmptyText: {
     ...Typography.subheadline,
-    color: Colors.textPrimary,
-    fontWeight: '500',
+    color: '#ffffff',
+    fontWeight: '600',
   },
   modalEmptySubtext: {
     ...Typography.caption1,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
   },
   sessionList: {
@@ -809,10 +828,12 @@ const styles = StyleSheet.create({
   },
   // ─── Session row ──────────────────────────────────────────────────────────
   sessionRow: {
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.background,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     overflow: 'hidden',
     marginBottom: Spacing.sm,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   sessionRowHeader: {
     flexDirection: 'row',
@@ -828,11 +849,11 @@ const styles = StyleSheet.create({
   sessionRowDate: {
     ...Typography.footnote,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: '#ffffff',
   },
   sessionRowPreview: {
     ...Typography.caption1,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   // ─── Thread (read-only) ───────────────────────────────────────────────────
   sessionThread: {
@@ -840,7 +861,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
     gap: Spacing.xs,
     borderTopWidth: 0.5,
-    borderTopColor: Colors.separator,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
     paddingTop: Spacing.sm,
   },
   threadRow: {
@@ -859,14 +880,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
   },
   threadBubbleUser: {
-    backgroundColor: Colors.accent,
+    backgroundColor: ACCENT,
     borderBottomRightRadius: 3,
   },
   threadBubbleAI: {
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderBottomLeftRadius: 3,
     borderWidth: 0.5,
-    borderColor: Colors.separator,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   threadBubbleText: {
     ...Typography.footnote,
@@ -876,6 +897,6 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   threadBubbleTextAI: {
-    color: Colors.textPrimary,
+    color: '#ffffff',
   },
 });

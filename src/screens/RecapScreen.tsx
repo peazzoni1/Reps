@@ -27,7 +27,7 @@ import {
   clearTodayDailyMessage,
 } from '../services/storage';
 import { getMovementIcon, MOVEMENT_TYPES, FEELINGS } from '../constants/seasonal';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../theme';
+import { Typography, Spacing, BorderRadius } from '../theme';
 
 const MEALS: { id: MealType; label: string; icon: string }[] = [
   { id: 'breakfast', label: 'Breakfast', icon: '☀️' },
@@ -185,7 +185,7 @@ export default function TrackingScreen() {
         <Ionicons
           name={session.type === 'rest_day' ? 'moon-outline' : 'pulse-outline'}
           size={18}
-          color={session.type === 'rest_day' ? '#8a7aaa' : Colors.accent}
+          color={session.type === 'rest_day' ? '#8a7aaa' : '#3db88a'}
         />
       </View>
       <View style={styles.logBody}>
@@ -203,7 +203,7 @@ export default function TrackingScreen() {
         onPress={() => confirmDeleteExercise(session.id, session.label)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Ionicons name="trash-outline" size={16} color={Colors.textTertiary} />
+        <Ionicons name="trash-outline" size={16} color="rgba(255, 255, 255, 0.4)" />
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -233,7 +233,7 @@ export default function TrackingScreen() {
         onPress={() => confirmDeleteFood(entry.id, entry.description)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Ionicons name="trash-outline" size={16} color={Colors.textTertiary} />
+        <Ionicons name="trash-outline" size={16} color="rgba(255, 255, 255, 0.4)" />
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -268,7 +268,7 @@ export default function TrackingScreen() {
       {/* Content */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={Colors.accent} />
+          <ActivityIndicator color="#3db88a" />
         </View>
       ) : snapshots.length === 0 ? (
         <View style={styles.center}>
@@ -339,7 +339,7 @@ export default function TrackingScreen() {
                 value={foodDescription}
                 onChangeText={setFoodDescription}
                 placeholder="e.g. chicken rice and veggies"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor="rgba(255, 255, 255, 0.3)"
                 multiline
                 autoFocus
                 maxLength={300}
@@ -439,7 +439,7 @@ export default function TrackingScreen() {
                 value={editNote}
                 onChangeText={setEditNote}
                 placeholder="Anything you want to remember..."
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor="rgba(255, 255, 255, 0.3)"
                 multiline
                 maxLength={300}
               />
@@ -466,7 +466,7 @@ export default function TrackingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#1f2e4f',
   },
   header: {
     flexDirection: 'row',
@@ -474,23 +474,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: 'rgba(31, 46, 79, 0.97)',
     borderBottomWidth: 0.5,
-    borderBottomColor: Colors.separator,
+    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
   },
   headerTitle: {
     ...Typography.headline,
-    color: Colors.textPrimary,
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '700',
   },
   addButton: {
-    backgroundColor: Colors.accentLight,
+    backgroundColor: 'rgba(61, 184, 138, 0.15)',
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.pill,
   },
   addButtonText: {
     ...Typography.footnote,
-    color: Colors.accent,
+    color: '#3db88a',
     fontWeight: '600',
   },
   center: {
@@ -502,12 +504,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     ...Typography.title3,
-    color: Colors.textPrimary,
+    color: '#ffffff',
     textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '700',
   },
   emptySubtitle: {
     ...Typography.subheadline,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -521,25 +525,32 @@ const styles = StyleSheet.create({
   dayHeading: {
     ...Typography.footnote,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.6)',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     marginBottom: Spacing.xs,
   },
   categoryBlock: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: BorderRadius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 24,
     overflow: 'hidden',
-    ...Shadows.sm,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    shadowColor: '#3db88a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   categoryLabel: {
     ...Typography.caption2,
-    fontWeight: '600',
-    color: Colors.textTertiary,
-    letterSpacing: 1,
+    fontWeight: '700',
+    color: '#3db88a',
+    letterSpacing: 1.5,
     paddingHorizontal: Spacing.base,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
+    fontSize: 10,
   },
   logItem: {
     flexDirection: 'row',
@@ -548,21 +559,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.sm,
     borderTopWidth: 0.5,
-    borderTopColor: Colors.separator,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   logIconWrap: {
     width: 36,
     height: 36,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.accentLight,
+    backgroundColor: 'rgba(61, 184, 138, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   foodIconWrap: {
-    backgroundColor: '#FFF3E0',
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
   },
   restIconWrap: {
-    backgroundColor: '#ede8f5',
+    backgroundColor: 'rgba(138, 122, 170, 0.15)',
   },
   logIcon: {
     fontSize: 16,
@@ -572,12 +583,12 @@ const styles = StyleSheet.create({
   },
   logTitle: {
     ...Typography.subheadline,
-    color: Colors.textPrimary,
-    fontWeight: '500',
+    color: '#ffffff',
+    fontWeight: '600',
   },
   logMeta: {
     ...Typography.caption1,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.6)',
     marginTop: 2,
   },
   deleteButton: {
@@ -590,15 +601,19 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.overlay,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalSheet: {
-    backgroundColor: Colors.cardBackground,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#1f2e4f',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: '90%',
     flexShrink: 1,
     paddingTop: Spacing.md,
+    borderTopWidth: 0.5,
+    borderLeftWidth: 0.5,
+    borderRightWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   modalScrollContent: {
     padding: Spacing.xl,
@@ -608,20 +623,23 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.separator,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignSelf: 'center',
     marginBottom: Spacing.xs,
   },
   modalTitle: {
     ...Typography.title3,
-    color: Colors.textPrimary,
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
   },
   modalLabel: {
     ...Typography.footnote,
-    fontWeight: '600',
-    color: Colors.textSecondary,
+    fontWeight: '700',
+    color: '#3db88a',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1.5,
+    fontSize: 10,
   },
   mealRow: {
     flexDirection: 'row',
@@ -635,45 +653,55 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.pill,
-    borderWidth: 1.5,
-    borderColor: Colors.separator,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'transparent',
   },
   mealPillSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accentLight,
+    borderColor: '#ffffff',
+    backgroundColor: 'rgba(61, 184, 138, 0.15)',
   },
   mealPillIcon: {
     fontSize: 14,
   },
   mealPillText: {
     ...Typography.footnote,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
   },
   mealPillTextSelected: {
-    color: Colors.accent,
+    color: '#ffffff',
+    fontWeight: '600',
   },
   modalInput: {
     ...Typography.body,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.lg,
+    color: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
     padding: Spacing.md,
     minHeight: 80,
     textAlignVertical: 'top',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   modalSave: {
-    backgroundColor: Colors.accent,
-    borderRadius: BorderRadius.lg,
+    backgroundColor: '#f5a623',
+    borderRadius: 14,
     padding: Spacing.base,
     alignItems: 'center',
     marginTop: Spacing.xs,
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   modalSaveDisabled: {
-    backgroundColor: Colors.separator,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalSaveText: {
     ...Typography.headline,
     color: '#fff',
+    fontWeight: '600',
   },
 });
