@@ -10,6 +10,7 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
@@ -53,9 +54,41 @@ const MEALS: { id: MealType; label: string; icon: string; color: string }[] = [
   { id: 'snack', label: 'Snack', icon: '🍎', color: 'rgba(244, 67, 54, 0.15)' },
 ];
 
+// Header logo component - smaller version for the header
+function HeaderLogo() {
+  const ARC_PATHS = [
+    { d: 'M25,58 C25,49.7 31.7,43 40,43 C48.3,43 55,49.7 55,58' }, // inner
+    { d: 'M15,58 C15,44.2 26.2,33 40,33 C53.8,33 65,44.2 65,58' }, // middle
+    { d: 'M5,58 C5,38.7 20.7,23 40,23 C59.3,23 75,38.7 75,58' },   // outer
+  ];
+
+  return (
+    <Svg width={44} height={33} viewBox="0 0 80 60">
+      {ARC_PATHS.map((arc, i) => (
+        <Path
+          key={i}
+          d={arc.d}
+          fill="none"
+          stroke={i === 2 ? 'rgba(245, 166, 35, 0.7)' : (i === 0 ? '#3db88a' : 'rgba(61, 184, 138, 0.6)')}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
+      ))}
+    </Svg>
+  );
+}
+
+type UserProfile = {
+  first_name: string;
+  last_name: string;
+  sex: 'male' | 'female' | 'other';
+  birthdate: string;
+};
+
 export default function HomeScreen() {
   const [profileVisible, setProfileVisible] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [coachMessage, setCoachMessage] = useState<DailyCheckInMessage | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachExpanded, setCoachExpanded] = useState(false);
@@ -88,8 +121,21 @@ export default function HomeScreen() {
   });
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUserEmail(user?.email ?? null);
+
+      // Fetch user profile
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('first_name, last_name, sex, birthdate')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile) {
+          setUserProfile(profile);
+        }
+      }
     });
     // Schedule daily 8PM recap notification
     scheduleDailyRecapNotification().catch(() => {});
@@ -238,7 +284,25 @@ export default function HomeScreen() {
     );
   };
 
-  const initials = userEmail ? userEmail[0].toUpperCase() : '?';
+  const getInitials = (): string => {
+    // Use first and last name from profile if available
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return (userProfile.first_name[0] + userProfile.last_name[0]).toUpperCase();
+    }
+    // Fallback to email parsing if profile not loaded yet
+    if (!userEmail) return '?';
+    const username = userEmail.split('@')[0];
+    const parts = username.split(/[._-]/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    if (username.length >= 2) {
+      return (username[0] + username[1]).toUpperCase();
+    }
+    return username[0].toUpperCase();
+  };
+
+  const initials = getInitials();
 
   const ACCENT = '#3db88a';
 
@@ -246,18 +310,24 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={[styles.headerTitle, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>Today</Text>
-        {weather ? (
-          <View style={styles.weatherBadge}>
-            <Ionicons name={weather.iconName as any} size={14} color={ACCENT} />
-            <Text style={styles.weatherText}>{weather.temp}°</Text>
-          </View>
-        ) : (
-          <View style={styles.weatherBadge} />
-        )}
-        <TouchableOpacity style={styles.userButton} onPress={() => setProfileVisible(true)} activeOpacity={0.8}>
-          <Text style={styles.userInitials}>{initials}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          {weather ? (
+            <View style={styles.weatherBadge}>
+              <Ionicons name={weather.iconName as any} size={14} color={ACCENT} />
+              <Text style={styles.weatherText}>{weather.temp}°</Text>
+            </View>
+          ) : (
+            <View style={styles.weatherBadge} />
+          )}
+        </View>
+        <View style={styles.headerCenter}>
+          <HeaderLogo />
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.userButton} onPress={() => setProfileVisible(true)} activeOpacity={0.8}>
+            <Text style={styles.userInitials}>{initials}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -476,9 +546,38 @@ export default function HomeScreen() {
               <Text style={styles.avatarInitials}>{initials}</Text>
             </View>
 
+            {/* Name */}
+            {userProfile && (
+              <Text style={styles.userName}>
+                {userProfile.first_name} {userProfile.last_name}
+              </Text>
+            )}
+
             {/* Email */}
             {userEmail && (
               <Text style={styles.email}>{userEmail}</Text>
+            )}
+
+            {/* Profile Details */}
+            {userProfile && (
+              <View style={styles.profileDetails}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Sex</Text>
+                  <Text style={styles.detailValue}>
+                    {userProfile.sex.charAt(0).toUpperCase() + userProfile.sex.slice(1)}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Birthdate</Text>
+                  <Text style={styles.detailValue}>
+                    {new Date(userProfile.birthdate).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </Text>
+                </View>
+              </View>
             )}
 
             <View style={styles.divider} />
@@ -513,6 +612,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: 'rgba(255, 255, 255, 0.12)',
   },
+  headerLeft: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -8,
+  },
+  headerRight: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
   headerTitle: {
     ...Typography.headline,
     color: '#ffffff',
@@ -535,7 +647,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: 'rgba(61, 184, 138, 0.12)',
-    paddingVertical: 5,
+    paddingVertical: Spacing.xs,
     paddingHorizontal: 11,
     borderRadius: 20,
     borderWidth: 0.5,
@@ -803,11 +915,45 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#3db88a',
   },
+  userName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginTop: 8,
+  },
   email: {
     fontSize: 15,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.6)',
     marginTop: 4,
+  },
+  profileDetails: {
+    width: '100%',
+    gap: 12,
+    marginTop: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  detailLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  detailValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   divider: {
     width: '100%',

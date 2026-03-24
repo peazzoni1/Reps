@@ -13,7 +13,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,23 +36,35 @@ const ARC_PATHS = [
 ];
 const ARC_OPACITIES = [1.0, 0.6, 0.3];
 
-// Static stacked arc logo with teal gradient
+// Static stacked arc logo with teal and orange arcs
 function ArcLogo() {
   return (
-    <Svg width={80} height={60} viewBox="0 0 80 60">
-      {ARC_PATHS.map((arc, i) => (
-        <Path
-          key={i}
-          d={arc.d}
-          fill="none"
-          stroke={i === 0 ? '#3db88a' : `rgba(61, 184, 138, ${ARC_OPACITIES[i]})`}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-        />
-      ))}
-    </Svg>
+    <View style={logoStyles.logoGlow}>
+      <Svg width={80} height={60} viewBox="0 0 80 60">
+        {ARC_PATHS.map((arc, i) => (
+          <Path
+            key={i}
+            d={arc.d}
+            fill="none"
+            stroke={i === 2 ? 'rgba(245, 166, 35, 0.45)' : (i === 0 ? '#3db88a' : `rgba(61, 184, 138, ${ARC_OPACITIES[i]})`)}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
+        ))}
+      </Svg>
+    </View>
   );
 }
+
+const logoStyles = StyleSheet.create({
+  logoGlow: {
+    shadowColor: '#3db88a',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+});
 
 function PrivacyPolicyModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
@@ -166,6 +179,8 @@ export default function AuthScreen() {
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const insets = useSafeAreaInsets();
 
   const [fontsLoaded] = useFonts({ Nunito_700Bold });
@@ -232,7 +247,11 @@ export default function AuthScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#2d4a66', '#1f2e4f', '#16202f']}
+      locations={[0, 0.5, 1]}
+      style={styles.container}
+    >
       <PrivacyPolicyModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
       <KeyboardAvoidingView
         style={styles.flex}
@@ -258,21 +277,25 @@ export default function AuthScreen() {
           {/* Form block */}
           <View style={styles.form}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, emailFocused && styles.inputFocused]}
               placeholder="Email"
               placeholderTextColor="rgba(255, 255, 255, 0.35)"
               value={email}
               onChangeText={setEmail}
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
             />
             <TextInput
-              style={styles.input}
+              style={[styles.input, passwordFocused && styles.inputFocused]}
               placeholder="Password"
               placeholderTextColor="rgba(255, 255, 255, 0.35)"
               value={password}
               onChangeText={setPassword}
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
               secureTextEntry
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             />
@@ -336,7 +359,7 @@ export default function AuthScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -357,7 +380,7 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: '700',
     color: '#ffffff',
-    marginTop: 16,
+    marginTop: 12,
     marginBottom: 8,
     letterSpacing: 1,
   },
@@ -365,7 +388,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 48,
+    marginBottom: 32,
     letterSpacing: 0.2,
   },
   form: {
@@ -382,6 +405,14 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
+  inputFocused: {
+    borderColor: '#3db88a',
+    shadowColor: '#3db88a',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   button: {
     backgroundColor: '#f5a623',
     borderRadius: 14,
@@ -390,7 +421,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     shadowColor: '#f5a623',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.45,
     shadowRadius: 6,
     elevation: 4,
   },

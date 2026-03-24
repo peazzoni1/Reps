@@ -1,0 +1,35 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#1f2e4f"/>
+
+  <!-- Logo centered and scaled up -->
+  <!-- Original viewBox is 80x60, scaling to 880x660 and centering -->
+  <g transform="translate(72, 67) scale(11)">
+    <!-- Outer arc - orange with opacity -->
+    <path
+      d="M5,58 C5,38.7 20.7,23 40,23 C59.3,23 75,38.7 75,58"
+      fill="none"
+      stroke="rgba(245, 166, 35, 0.7)"
+      stroke-width="2.5"
+      stroke-linecap="round"
+    />
+
+    <!-- Middle arc - teal with opacity -->
+    <path
+      d="M15,58 C15,44.2 26.2,33 40,33 C53.8,33 65,44.2 65,58"
+      fill="none"
+      stroke="rgba(61, 184, 138, 0.6)"
+      stroke-width="2.5"
+      stroke-linecap="round"
+    />
+
+    <!-- Inner arc - solid teal -->
+    <path
+      d="M25,58 C25,49.7 31.7,43 40,43 C48.3,43 55,49.7 55,58"
+      fill="none"
+      stroke="#3db88a"
+      stroke-width="2.5"
+      stroke-linecap="round"
+    />
+  </g>
+</svg>

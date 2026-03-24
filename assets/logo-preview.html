@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Fitness Logo Preview</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      background: #f5f5f5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+    .preview-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .preview-card h2 {
+      margin-top: 0;
+      font-size: 18px;
+      color: #666;
+    }
+    .icon-preview {
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+      border-radius: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .size-label {
+      text-align: center;
+      margin-top: 10px;
+      color: #999;
+      font-size: 14px;
+    }
+    .instructions {
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .instructions h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    .instructions ol {
+      line-height: 1.8;
+      color: #666;
+    }
+    .instructions code {
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+    }
+    a {
+      color: #3db88a;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Blue Fitness Logo Preview</h1>
+
+    <div class="preview-grid">
+      <div class="preview-card">
+        <h2>App Icon (1024×1024)</h2>
+        <img src="logo.svg" alt="Blue Fitness Logo" class="icon-preview">
+        <p class="size-label">Dark background version</p>
+      </div>
+
+      <div class="preview-card">
+        <h2>Light Background Version</h2>
+        <svg width="400" height="400" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" class="icon-preview">
+          <!-- White Background -->
+          <rect width="1024" height="1024" fill="#ffffff"/>
+
+          <!-- Logo centered and scaled up -->
+          <g transform="translate(72, 67) scale(11)">
+            <!-- Outer arc - orange with opacity -->
+            <path
+              d="M5,58 C5,38.7 20.7,23 40,23 C59.3,23 75,38.7 75,58"
+              fill="none"
+              stroke="rgba(245, 166, 35, 0.7)"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            />
+
+            <!-- Middle arc - teal with opacity -->
+            <path
+              d="M15,58 C15,44.2 26.2,33 40,33 C53.8,33 65,44.2 65,58"
+              fill="none"
+              stroke="rgba(61, 184, 138, 0.6)"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            />
+
+            <!-- Inner arc - solid teal -->
+            <path
+              d="M25,58 C25,49.7 31.7,43 40,43 C48.3,43 55,49.7 55,58"
+              fill="none"
+              stroke="#3db88a"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            />
+          </g>
+        </svg>
+        <p class="size-label">Light background version</p>
+      </div>
+    </div>
+
+    <div class="instructions">
+      <h2>How to Export to PNG</h2>
+      <ol>
+        <li>Open <code>logo.svg</code> in your browser (or view above)</li>
+        <li>Use one of these methods to convert to PNG at 1024×1024:
+          <ul>
+            <li><strong>Online:</strong> Upload <code>logo.svg</code> to <a href="https://cloudconvert.com/svg-to-png" target="_blank">CloudConvert</a> and set size to 1024×1024</li>
+            <li><strong>macOS:</strong> Open in Preview → File → Export → Set width to 1024 → Save as PNG</li>
+            <li><strong>Command line (if you have ImageMagick):</strong><br>
+              <code>convert -background none -resize 1024x1024 logo.svg icon.png</code>
+            </li>
+          </ul>
+        </li>
+        <li>Replace the following files:
+          <ul>
+            <li><code>assets/icon.png</code> (dark background version)</li>
+            <li><code>assets/adaptive-icon.png</code> (for Android)</li>
+            <li><code>assets/splash-icon.png</code> (for splash screen)</li>
+          </ul>
+        </li>
+      </ol>
+
+      <h2>Tips</h2>
+      <ul>
+        <li>The dark background version (#1f2e4f) matches your app's color scheme</li>
+        <li>For Android adaptive icons, you might want to use a transparent or white background</li>
+        <li>Test both versions to see which looks better on different backgrounds</li>
+        <li>Make sure to export at exactly 1024×1024 pixels for best quality</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
