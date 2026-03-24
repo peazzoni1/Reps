@@ -7,6 +7,10 @@ import {
   TouchableOpacity,
   TextInput,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDailyNote, saveDailyNote, toLocalDateStr } from '../services/storage';
@@ -79,36 +83,41 @@ export default function DailyNotesModal({ visible, onClose, onSave, season }: Da
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
         <Pressable style={styles.modalBackdrop} onPress={handleClose} />
-        <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
-          <View style={styles.modalHandle} />
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
+            <View style={styles.modalHandle} />
 
-          <View style={styles.notesCard}>
-            <Text style={styles.notesCardHeader}>✍️ DAILY NOTES</Text>
-            <Text style={styles.notesDate}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+            <View style={styles.notesCard}>
+              <Text style={styles.notesCardHeader}>✍️ DAILY NOTES</Text>
+              <Text style={styles.notesDate}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
 
-            <TextInput
-              style={styles.notesInput}
-              value={noteContent}
-              onChangeText={handleTextChange}
-              placeholder="How are you feeling today? What's on your mind?"
-              placeholderTextColor="rgba(255, 255, 255, 0.3)"
-              multiline
-              maxLength={maxChars}
-              textAlignVertical="top"
-            />
+              <TextInput
+                style={styles.notesInput}
+                value={noteContent}
+                onChangeText={handleTextChange}
+                placeholder="How are you feeling today? What's on your mind?"
+                placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                multiline
+                maxLength={maxChars}
+                textAlignVertical="top"
+              />
 
-            <View style={styles.footer}>
-              <Text style={styles.charCount}>
-                {charCount}/{maxChars}
-              </Text>
-              {isSaving && <Text style={styles.savingText}>Saving...</Text>}
-              {!isSaving && charCount > 0 && <Text style={styles.savedText}>Saved</Text>}
+              <View style={styles.footer}>
+                <Text style={styles.charCount}>
+                  {charCount}/{maxChars}
+                </Text>
+                {isSaving && <Text style={styles.savingText}>Saving...</Text>}
+                {!isSaving && charCount > 0 && <Text style={styles.savedText}>Saved</Text>}
+              </View>
             </View>
           </View>
-        </View>
-      </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

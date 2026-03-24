@@ -25,6 +25,10 @@ import {
   deleteFoodEntry,
   getCustomMovementTypes,
   clearTodayDailyMessage,
+  getAllDailyNotes,
+  DailyNote,
+  saveDailyNote,
+  deleteDailyNote,
 } from '../services/storage';
 import { getMovementIcon, MOVEMENT_TYPES, FEELINGS } from '../constants/seasonal';
 import { Typography, Spacing, BorderRadius } from '../theme';
@@ -68,6 +72,7 @@ export default function TrackingScreen() {
   const [snapshots, setSnapshots] = useState<DailySnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [customMovementTypes, setCustomMovementTypes] = useState<Array<{ id: string; label: string; icon: string }>>([]);
+  const [dailyNotes, setDailyNotes] = useState<DailyNote[]>([]);
 
   const todayDateStr = new Date().toISOString().split('T')[0];
 
@@ -89,14 +94,22 @@ export default function TrackingScreen() {
   // Shared date state (one modal open at a time)
   const [selectedDate, setSelectedDate] = useState<string>(todayDateStr);
 
+  // Notes modal state
+  const [notesModalVisible, setNotesModalVisible] = useState(false);
+  const [editingNote, setEditingNote] = useState<DailyNote | null>(null);
+  const [noteContent, setNoteContent] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const [data, customTypes] = await Promise.all([
+    const [data, customTypes, notes] = await Promise.all([
       getRecentDailySnapshots(10),
       getCustomMovementTypes(),
+      getAllDailyNotes(),
     ]);
     setSnapshots(data);
     setCustomMovementTypes(customTypes);
+    setDailyNotes(notes);
     setLoading(false);
   }, []);
 
@@ -174,6 +187,35 @@ export default function TrackingScreen() {
     ]);
   };
 
+  const openNotesModal = (date: string, existingNote?: DailyNote) => {
+    setEditingNote(existingNote ?? null);
+    setNoteContent(existingNote?.content ?? '');
+    setSelectedDate(date);
+    setNotesModalVisible(true);
+  };
+
+  const handleSaveNote = async () => {
+    const content = noteContent.trim();
+    if (!content) return;
+    setSavingNote(true);
+    await saveDailyNote(selectedDate, content);
+    clearTodayDailyMessage();
+    setSavingNote(false);
+    setNotesModalVisible(false);
+    load();
+  };
+
+  const confirmDeleteNote = (date: string) => {
+    Alert.alert('Delete note', 'Remove this note?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => { await deleteDailyNote(date); load(); },
+      },
+    ]);
+  };
+
   const renderExerciseItem = (session: DailySnapshot['exercises'][number]) => (
     <TouchableOpacity
       key={session.id}
@@ -238,25 +280,62 @@ export default function TrackingScreen() {
     </TouchableOpacity>
   );
 
-  const renderDay = (snapshot: DailySnapshot) => (
-    <View key={snapshot.date} style={styles.daySection}>
-      <Text style={styles.dayHeading}>{formatDateHeading(snapshot.date)}</Text>
-
-      {snapshot.exercises.length > 0 && (
-        <View style={styles.categoryBlock}>
-          <Text style={styles.categoryLabel}>EXERCISE</Text>
-          {snapshot.exercises.map(renderExerciseItem)}
-        </View>
-      )}
-
-      {snapshot.food.length > 0 && (
-        <View style={styles.categoryBlock}>
-          <Text style={styles.categoryLabel}>FOOD</Text>
-          {snapshot.food.map(renderFoodItem)}
-        </View>
-      )}
-    </View>
+  const renderNoteItem = (note: DailyNote) => (
+    <TouchableOpacity
+      key={note.date}
+      style={styles.logItem}
+      onPress={() => openNotesModal(note.date, note)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.logIconWrap, styles.notesIconWrap]}>
+        <Ionicons name="document-text-outline" size={18} color="#7ab8c8" />
+      </View>
+      <View style={styles.logBody}>
+        <Text style={styles.logTitle} numberOfLines={2}>{note.content}</Text>
+        <Text style={styles.logMeta}>
+          {note.content.length} characters
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => confirmDeleteNote(note.date)}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="trash-outline" size={16} color="rgba(255, 255, 255, 0.4)" />
+      </TouchableOpacity>
+    </TouchableOpacity>
   );
+
+  const renderDay = (snapshot: DailySnapshot) => {
+    const dayNote = dailyNotes.find(n => n.date === snapshot.date);
+
+    return (
+      <View key={snapshot.date} style={styles.daySection}>
+        <Text style={styles.dayHeading}>{formatDateHeading(snapshot.date)}</Text>
+
+        {snapshot.exercises.length > 0 && (
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>EXERCISE</Text>
+            {snapshot.exercises.map(renderExerciseItem)}
+          </View>
+        )}
+
+        {snapshot.food.length > 0 && (
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>FOOD</Text>
+            {snapshot.food.map(renderFoodItem)}
+          </View>
+        )}
+
+        {dayNote && (
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>NOTES</Text>
+            {renderNoteItem(dayNote)}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -459,6 +538,66 @@ export default function TrackingScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Notes edit modal */}
+      <Modal visible={notesModalVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setNotesModalVisible(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[styles.modalScrollContent, { paddingBottom: insets.bottom + Spacing.xxl }]}
+            >
+              <Text style={styles.modalTitle}>{editingNote ? 'Edit Note' : 'Add Note'}</Text>
+
+              <Text style={styles.modalLabel}>Date</Text>
+              <View style={styles.mealRow}>
+                {getDateOptions().map(({ label, date }) => (
+                  <TouchableOpacity
+                    key={date}
+                    style={[styles.mealPill, selectedDate === date && styles.mealPillSelected]}
+                    onPress={() => setSelectedDate(date)}
+                  >
+                    <Text style={[styles.mealPillText, selectedDate === date && styles.mealPillTextSelected]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.modalLabel}>What's on your mind?</Text>
+              <TextInput
+                style={[styles.modalInput, { minHeight: 150 }]}
+                value={noteContent}
+                onChangeText={setNoteContent}
+                placeholder="How are you feeling today? What's on your mind?"
+                placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                multiline
+                autoFocus
+                maxLength={500}
+              />
+              <Text style={styles.logMeta}>{noteContent.length}/500 characters</Text>
+
+              <TouchableOpacity
+                style={[styles.modalSave, (!noteContent.trim() || savingNote) && styles.modalSaveDisabled]}
+                onPress={handleSaveNote}
+                disabled={!noteContent.trim() || savingNote}
+              >
+                {savingNote ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalSaveText}>{editingNote ? 'Update' : 'Save'}</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -574,6 +713,9 @@ const styles = StyleSheet.create({
   },
   restIconWrap: {
     backgroundColor: 'rgba(138, 122, 170, 0.15)',
+  },
+  notesIconWrap: {
+    backgroundColor: 'rgba(122, 184, 200, 0.15)',
   },
   logIcon: {
     fontSize: 16,

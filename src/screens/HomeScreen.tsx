@@ -562,6 +562,16 @@ export default function HomeScreen() {
           />
           <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
             <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalHeaderTitle}>Log Activity</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setActivityModalVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={24} color="rgba(255, 255, 255, 0.7)" />
+              </TouchableOpacity>
+            </View>
             <QuickLogCard
               season={{ ...season, color: '#3db88a', accent: '#7ab8c8', cardBg: 'rgba(255, 255, 255, 0.06)', textSecondary: 'rgba(255, 255, 255, 0.55)' }}
               onSave={(entry) => {
@@ -969,5 +979,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.4)',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+  },
+  modalHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  modalCloseButton: {
+    padding: Spacing.xs,
   },
 });

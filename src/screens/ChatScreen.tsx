@@ -105,7 +105,8 @@ export default function ChatScreen() {
   // Listen for user sign-in event and reset chat session
   useEffect(() => {
     const handleUserSignIn = async () => {
-      if (sessionState === 'active') {
+      // Close any existing session and start fresh on login
+      if (session) {
         const newSession = await createCoachSession();
         setSession(newSession);
         setMessages([]);
@@ -120,7 +121,7 @@ export default function ChatScreen() {
     return () => {
       signInListener.remove();
     };
-  }, [sessionState]);
+  }, [session]);
 
   // Initialize: load or create active session, load supporting data
   useEffect(() => {

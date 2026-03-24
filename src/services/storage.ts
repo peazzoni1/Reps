@@ -447,6 +447,30 @@ export const saveDailyNote = async (date: string, content: string): Promise<void
   }
 };
 
+export const getAllDailyNotes = async (): Promise<DailyNote[]> => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const noteKeys = keys.filter(key => key.startsWith(DAILY_NOTES_PREFIX));
+    const notes = await AsyncStorage.multiGet(noteKeys);
+    return notes
+      .map(([_, value]) => (value ? JSON.parse(value) : null))
+      .filter((note): note is DailyNote => note !== null && note.content.trim().length > 0)
+      .sort((a, b) => b.date.localeCompare(a.date)); // Most recent first
+  } catch (error) {
+    console.error('Error loading all daily notes:', error);
+    return [];
+  }
+};
+
+export const deleteDailyNote = async (date: string): Promise<void> => {
+  try {
+    const key = `${DAILY_NOTES_PREFIX}${date}`;
+    await AsyncStorage.removeItem(key);
+  } catch (error) {
+    console.error('Error deleting daily note:', error);
+  }
+};
+
 // Helper functions for tile status
 export const getTodayMovementSessions = async (): Promise<MovementSession[]> => {
   const sessions = await getAllMovementSessions();
