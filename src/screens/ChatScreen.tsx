@@ -11,8 +11,9 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  AppState,
 } from 'react-native';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ChatMessage, DailySnapshot, CoachSession, MemoryBullet } from '../types';
@@ -34,6 +35,7 @@ import { TabParamList } from '../navigation/TabNavigator';
 const SESSION_MESSAGE_LIMIT = 5;
 const DAILY_MESSAGE_LIMIT = 10;
 const ACCENT = '#3db88a';
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -72,6 +74,33 @@ export default function ChatScreen() {
 
   const listRef = useRef<FlatList>(null);
   const appliedInitialMessage = useRef<string | null>(null);
+  const lastActivityTime = useRef<number>(Date.now());
+
+  // Check for inactivity timeout and start fresh session if needed
+  const checkInactivityTimeout = useCallback(async () => {
+    const timeSinceLastActivity = Date.now() - lastActivityTime.current;
+
+    if (
+      timeSinceLastActivity >= INACTIVITY_TIMEOUT_MS &&
+      sessionState === 'active' &&
+      messages.length > 0
+    ) {
+      // Session has been inactive for too long, start fresh
+      const newSession = await createCoachSession();
+      setSession(newSession);
+      setMessages([]);
+      appliedInitialMessage.current = null;
+      setSessionState('active');
+      lastActivityTime.current = Date.now();
+    }
+  }, [sessionState, messages.length]);
+
+  // Check for timeout when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      checkInactivityTimeout();
+    }, [checkInactivityTimeout])
+  );
 
   // Initialize: load or create active session, load supporting data
   useEffect(() => {
@@ -92,6 +121,7 @@ export default function ChatScreen() {
       if (active) {
         setSession(active);
         setMessages(active.messages);
+        lastActivityTime.current = Date.now();
         // If app was closed while mid-summary, complete it now
         if (active.messages.length >= SESSION_MESSAGE_LIMIT) {
           triggerSessionEnd(active, active.messages);
@@ -102,6 +132,7 @@ export default function ChatScreen() {
         const newSession = await createCoachSession();
         setSession(newSession);
         setSessionState('active');
+        lastActivityTime.current = Date.now();
       }
     };
     init();
@@ -168,6 +199,9 @@ export default function ChatScreen() {
     if (!text || isLoading || sessionState !== 'active' || !session) return;
     if (dailyCount >= DAILY_MESSAGE_LIMIT) return;
 
+    // Update last activity time
+    lastActivityTime.current = Date.now();
+
     const userMessage: ChatMessage = {
       id: generateId(),
       role: 'user',
@@ -225,6 +259,7 @@ export default function ChatScreen() {
     setMessages([]);
     appliedInitialMessage.current = null;
     setSessionState('active');
+    lastActivityTime.current = Date.now();
   };
 
   const handleOpenPastSessions = async () => {
