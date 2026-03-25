@@ -4,6 +4,10 @@ import { SubscriptionInfo } from '../types';
 
 const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 
+// Track initialization state
+let isInitialized = false;
+let initializationPromise: Promise<void> | null = null;
+
 /**
  * Initialize RevenueCat SDK with user ID
  * Should be called after user authentication
@@ -14,15 +18,62 @@ export async function initializeRevenueCat(userId: string): Promise<void> {
     return;
   }
 
-  try {
-    await Purchases.configure({
-      apiKey: REVENUECAT_API_KEY,
-      appUserID: userId
-    });
-    console.log('RevenueCat initialized for user:', userId);
-  } catch (error) {
-    console.error('RevenueCat initialization error:', error);
+  // If already initialized, skip
+  if (isInitialized) {
+    console.log('RevenueCat already initialized');
+    return;
   }
+
+  // If initialization is in progress, wait for it
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  // Start initialization
+  initializationPromise = (async () => {
+    try {
+      await Purchases.configure({
+        apiKey: REVENUECAT_API_KEY,
+        appUserID: userId
+      });
+      isInitialized = true;
+      console.log('RevenueCat initialized for user:', userId);
+    } catch (error) {
+      console.error('RevenueCat initialization error:', error);
+      isInitialized = false;
+    } finally {
+      initializationPromise = null;
+    }
+  })();
+
+  return initializationPromise;
+}
+
+/**
+ * Check if RevenueCat SDK is initialized
+ */
+export function isRevenueCatInitialized(): boolean {
+  return isInitialized;
+}
+
+/**
+ * Wait for RevenueCat to be initialized
+ * Returns true if initialized successfully, false if timeout
+ */
+async function waitForInitialization(timeoutMs: number = 5000): Promise<boolean> {
+  if (isInitialized) return true;
+  if (initializationPromise) {
+    await initializationPromise;
+    return isInitialized;
+  }
+
+  // Wait with timeout
+  const startTime = Date.now();
+  while (!isInitialized && Date.now() - startTime < timeoutMs) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  return isInitialized;
 }
 
 /**
@@ -30,6 +81,19 @@ export async function initializeRevenueCat(userId: string): Promise<void> {
  * Returns subscription tier, status, and expiration info
  */
 export async function getSubscriptionStatus(): Promise<SubscriptionInfo> {
+  // Wait for initialization (up to 5 seconds)
+  const initialized = await waitForInitialization();
+
+  if (!initialized) {
+    console.warn('RevenueCat not initialized, returning free tier');
+    return {
+      tier: 'free',
+      status: 'inactive',
+      expiresAt: null,
+      isActive: false
+    };
+  }
+
   try {
     const customerInfo: CustomerInfo = await Purchases.getCustomerInfo();
     const hasPremium = customerInfo.entitlements.active['premium_access'] !== undefined;
@@ -62,6 +126,14 @@ export async function getSubscriptionStatus(): Promise<SubscriptionInfo> {
  * Returns array of available subscription packages to purchase
  */
 export async function getOfferings(): Promise<PurchasesPackage[]> {
+  // Wait for initialization (up to 5 seconds)
+  const initialized = await waitForInitialization();
+
+  if (!initialized) {
+    console.warn('RevenueCat not initialized, returning empty offerings');
+    return [];
+  }
+
   try {
     const offerings: PurchasesOfferings = await Purchases.getOfferings();
 
@@ -82,6 +154,13 @@ export async function getOfferings(): Promise<PurchasesPackage[]> {
  * Handles the purchase flow and returns updated customer info
  */
 export async function purchasePackage(pkg: PurchasesPackage): Promise<CustomerInfo | null> {
+  // Wait for initialization
+  const initialized = await waitForInitialization();
+
+  if (!initialized) {
+    throw new Error('RevenueCat not initialized. Please try again.');
+  }
+
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
 
@@ -106,6 +185,13 @@ export async function purchasePackage(pkg: PurchasesPackage): Promise<CustomerIn
  * Useful when user reinstalls app or switches devices
  */
 export async function restorePurchases(): Promise<CustomerInfo | null> {
+  // Wait for initialization
+  const initialized = await waitForInitialization();
+
+  if (!initialized) {
+    throw new Error('RevenueCat not initialized. Please try again.');
+  }
+
   try {
     const customerInfo = await Purchases.restorePurchases();
 

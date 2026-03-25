@@ -13,7 +13,7 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FeelingType, MovementType, WorkoutExercise } from '../types';
+import { FeelingType, MovementType, WorkoutExercise, SubscriptionTier, CheckInQuota } from '../types';
 import {
   createMovementSession,
   getRecentDailySnapshots,
@@ -37,7 +37,12 @@ import QuickAccessTile from '../components/QuickAccessTile';
 import FoodLogModal from '../components/FoodLogModal';
 import DailyNotesModal from '../components/DailyNotesModal';
 import GoalsModal from '../components/GoalsModal';
+import PaywallModal from '../components/PaywallModal';
+import SubscriptionBadge from '../components/SubscriptionBadge';
+import CheckInQuotaDisplay from '../components/CheckInQuotaDisplay';
 import { getDailyCheckIn } from '../services/anthropic';
+import { getSubscriptionStatus } from '../services/subscriptions';
+import { getCheckInQuota, incrementCheckInCount, canUseCheckIn } from '../services/checkInTracking';
 import { schedulePostWorkoutNotification, scheduleDailyRecapNotification } from '../services/notifications';
 
 type WeatherInfo = { temp: number; iconName: string };
@@ -109,6 +114,12 @@ export default function HomeScreen() {
   const [notesStatus, setNotesStatus] = useState('No notes yet');
   const [goalsStatus, setGoalsStatus] = useState('Coming soon');
 
+  // Subscription states
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
+  const [checkInQuota, setCheckInQuota] = useState<CheckInQuota | null>(null);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [paywallVariant, setPaywallVariant] = useState<'soft' | 'hard'>('soft');
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUserEmail(user?.email ?? null);
@@ -130,6 +141,17 @@ export default function HomeScreen() {
     scheduleDailyRecapNotification().catch(() => {});
     // Load tile statuses
     loadStatuses();
+    // Load subscription status
+    loadSubscriptionStatus();
+  }, []);
+
+  const loadSubscriptionStatus = useCallback(async () => {
+    const [subscription, quota] = await Promise.all([
+      getSubscriptionStatus(),
+      getCheckInQuota(),
+    ]);
+    setSubscriptionTier(subscription.tier);
+    setCheckInQuota(quota);
   }, []);
 
   const loadStatuses = useCallback(async () => {
@@ -197,6 +219,14 @@ export default function HomeScreen() {
     const key = ++loadKeyRef.current;
 
     if (bustCache) {
+      // Check quota before allowing refresh
+      const canUse = await canUseCheckIn();
+      if (!canUse) {
+        setPaywallVariant('hard');
+        setPaywallVisible(true);
+        return;
+      }
+
       await clearTodayDailyMessage();
       setCoachLoading(true);
       setCoachMessage(null);
@@ -232,6 +262,19 @@ export default function HomeScreen() {
         };
         await storeDailyMessage(entry);
         setCoachMessage(entry);
+
+        // Increment check-in count after successful generation
+        await incrementCheckInCount();
+
+        // Reload quota to update UI
+        const updatedQuota = await getCheckInQuota();
+        setCheckInQuota(updatedQuota);
+
+        // Show soft paywall if this was the last free check-in
+        if (!updatedQuota.isPremium && updatedQuota.remaining === 0) {
+          setPaywallVariant('soft');
+          setPaywallVisible(true);
+        }
       }
     } catch {}
     if (key === loadKeyRef.current) setCoachLoading(false);
@@ -391,6 +434,10 @@ export default function HomeScreen() {
                 />
               </TouchableOpacity>
             </View>
+
+            {/* Quota Display */}
+            {checkInQuota && <CheckInQuotaDisplay quota={checkInQuota} />}
+
             {coachLoading ? (
               <View style={styles.coachMessagePlaceholder}>
                 <View style={[styles.placeholderLine, { width: '60%', height: 16, marginBottom: 8 }]} />
@@ -499,6 +546,13 @@ export default function HomeScreen() {
               <Text style={styles.avatarInitials}>{initials}</Text>
             </View>
 
+            {/* Subscription Badge */}
+            {subscriptionTier === 'premium' && (
+              <View style={{ marginTop: 8 }}>
+                <SubscriptionBadge tier={subscriptionTier} />
+              </View>
+            )}
+
             {/* Name */}
             {userProfile && (userProfile.first_name || userProfile.last_name) && (
               <Text style={styles.userName}>
@@ -539,6 +593,30 @@ export default function HomeScreen() {
                   </View>
                 )}
               </View>
+            )}
+
+            {/* Subscription Buttons */}
+            {subscriptionTier === 'premium' ? (
+              <TouchableOpacity
+                style={styles.manageSubButton}
+                onPress={() => {
+                  setProfileVisible(false);
+                  setPaywallVisible(true);
+                }}
+              >
+                <Text style={styles.manageSubText}>Manage Subscription</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.upgradeButton}
+                onPress={() => {
+                  setProfileVisible(false);
+                  setPaywallVariant('soft');
+                  setPaywallVisible(true);
+                }}
+              >
+                <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+              </TouchableOpacity>
             )}
 
             <View style={styles.divider} />
@@ -618,6 +696,17 @@ export default function HomeScreen() {
         visible={goalsModalVisible}
         onClose={() => setGoalsModalVisible(false)}
         season={season}
+      />
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={paywallVisible}
+        onClose={() => setPaywallVisible(false)}
+        onSuccess={() => {
+          loadSubscriptionStatus();
+          setPaywallVisible(false);
+        }}
+        variant={paywallVariant}
       />
     </View>
   );
@@ -960,6 +1049,34 @@ const styles = StyleSheet.create({
     height: 0.5,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     marginVertical: 12,
+  },
+  manageSubButton: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: 'rgba(61, 184, 138, 0.1)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(61, 184, 138, 0.3)',
+    marginTop: 12,
+  },
+  manageSubText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3db88a',
+  },
+  upgradeButton: {
+    width: '100%',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#f5a623',
+    marginTop: 12,
+  },
+  upgradeButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   logoutButton: {
     width: '100%',
