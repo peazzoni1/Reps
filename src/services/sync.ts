@@ -9,6 +9,7 @@ const CUSTOM_MOVEMENT_TYPES_KEY = '@reps_custom_movement_types';
 const FOOD_ENTRIES_KEY = '@reps_food_entries';
 const ACTIVITY_PREFS_KEY = '@reps_activity_preferences';
 const COACH_SESSIONS_KEY = '@coach_sessions';
+const SUBSCRIPTION_STATUS_KEY = '@reps_subscription_status';
 
 // ─── Private helpers ────────────────────────────────────────────────────────
 async function getUserId(): Promise<string | null> {
@@ -61,11 +62,13 @@ export async function syncFromSupabase(userId: string): Promise<void> {
       { data: foodEnts },
       { data: coachData },
       { data: prefsData },
+      { data: profileData },
     ] = await Promise.all([
       supabase.from('movement_sessions').select('*').eq('user_id', userId),
       supabase.from('food_entries').select('*').eq('user_id', userId),
       supabase.from('coach_sessions').select('*').eq('user_id', userId),
       supabase.from('user_preferences').select('*').eq('user_id', userId).maybeSingle(),
+      supabase.from('user_profiles').select('subscription_tier, subscription_status, subscription_expires_at').eq('user_id', userId).maybeSingle(),
     ]);
 
     const pairs: [string, string][] = [];
@@ -89,6 +92,18 @@ export async function syncFromSupabase(userId: string): Promise<void> {
       if (prefsData.activity_preferences) {
         pairs.push([ACTIVITY_PREFS_KEY, JSON.stringify(prefsData.activity_preferences)]);
       }
+    }
+
+    // Cache subscription status for offline access
+    if (profileData) {
+      pairs.push([
+        SUBSCRIPTION_STATUS_KEY,
+        JSON.stringify({
+          tier: profileData.subscription_tier || 'free',
+          status: profileData.subscription_status || 'inactive',
+          expiresAt: profileData.subscription_expires_at || null,
+        })
+      ]);
     }
 
     if (pairs.length > 0) {

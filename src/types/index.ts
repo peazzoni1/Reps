@@ -69,3 +69,22 @@ export interface DailySnapshot {
   exercises: MovementSession[];
   food: FoodEntry[];
 }
+
+// Subscription types
+export type SubscriptionTier = 'free' | 'premium';
+export type SubscriptionStatus = 'active' | 'inactive' | 'expired' | 'grace_period';
+
+export interface SubscriptionInfo {
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  expiresAt: string | null;
+  isActive: boolean;
+}
+
+// Daily check-in quota types
+export interface CheckInQuota {
+  remaining: number;
+  total: number;
+  weekStartDate: string; // YYYY-MM-DD (Sunday)
+  isPremium: boolean;
+}

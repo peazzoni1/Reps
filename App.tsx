@@ -8,6 +8,7 @@ import { Session } from '@supabase/supabase-js';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { supabase } from './src/lib/supabase';
 import { syncFromSupabase } from './src/services/sync';
+import { initializeRevenueCat } from './src/services/subscriptions';
 import TabNavigator from './src/navigation/TabNavigator';
 import AuthScreen from './src/screens/AuthScreen';
 import BiometricGateScreen from './src/screens/BiometricGateScreen';
@@ -36,6 +37,7 @@ export default function App() {
         await Promise.all([
           syncFromSupabase(session.user.id),
           checkUserProfile(session.user.id),
+          initializeRevenueCat(session.user.id),
         ]);
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -52,6 +54,7 @@ export default function App() {
         await Promise.all([
           syncFromSupabase(session.user.id),
           checkUserProfile(session.user.id),
+          initializeRevenueCat(session.user.id),
         ]);
         // Emit event to reset chat session on fresh login
         DeviceEventEmitter.emit('userSignedIn');
