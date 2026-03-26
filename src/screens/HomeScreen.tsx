@@ -43,7 +43,7 @@ import CheckInQuotaDisplay from '../components/CheckInQuotaDisplay';
 import { getDailyCheckIn } from '../services/anthropic';
 import { getSubscriptionStatus } from '../services/subscriptions';
 import { getCheckInQuota, incrementCheckInCount, canUseCheckIn } from '../services/checkInTracking';
-import { schedulePostWorkoutNotification, scheduleDailyRecapNotification } from '../services/notifications';
+import { scheduleDailyRecapNotification } from '../services/notifications';
 
 type WeatherInfo = { temp: number; iconName: string };
 
@@ -289,8 +289,6 @@ export default function HomeScreen() {
       entry.workoutDetails,
       entry.date
     );
-    // Coach check-in is now on-demand only, not auto-generated
-    schedulePostWorkoutNotification(session).catch(() => {});
     // Refresh activity status
     loadStatuses();
   };
