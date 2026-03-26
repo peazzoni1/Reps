@@ -8,6 +8,7 @@ const CUSTOM_MOVEMENT_TYPES_KEY = '@reps_custom_movement_types';
 const FOOD_ENTRIES_KEY = '@reps_food_entries';
 const ACTIVITY_PREFS_KEY = '@reps_activity_preferences';
 const COACH_SESSIONS_KEY = '@coach_sessions';
+const NOTIFICATION_PREFS_KEY = '@reps_notification_prefs';
 
 // Helper function to generate unique IDs
 const generateId = (): string => {
@@ -482,6 +483,24 @@ export const getTodayFoodEntries = async (): Promise<FoodEntry[]> => {
   const entries = await getAllFoodEntries();
   const todayStr = toLocalDateStr(new Date());
   return entries.filter(e => toLocalDateStr(new Date(e.date)) === todayStr);
+};
+
+// Notification Preferences
+export interface NotificationPrefs {
+  hour: number;
+  enabled: boolean;
+}
+
+export const getNotificationPrefs = async (): Promise<NotificationPrefs> => {
+  try {
+    const raw = await AsyncStorage.getItem(NOTIFICATION_PREFS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { hour: 20, enabled: true };
+};
+
+export const saveNotificationPrefs = async (prefs: NotificationPrefs): Promise<void> => {
+  await AsyncStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(prefs));
 };
 
 // Utility: clear all data

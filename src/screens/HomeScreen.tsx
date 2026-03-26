@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
+  Switch,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import * as Location from 'expo-location';
@@ -28,6 +29,8 @@ import {
   getTodayFoodEntries,
   getDailyNote,
   getAllDailyNotes,
+  getNotificationPrefs,
+  saveNotificationPrefs,
 } from '../services/storage';
 import { getBlendedTheme } from '../constants/seasonal';
 import { Typography, Spacing, BorderRadius } from '../theme';
@@ -43,9 +46,16 @@ import CheckInQuotaDisplay from '../components/CheckInQuotaDisplay';
 import { getDailyCheckIn } from '../services/anthropic';
 import { getSubscriptionStatus } from '../services/subscriptions';
 import { getCheckInQuota, incrementCheckInCount, canUseCheckIn } from '../services/checkInTracking';
-import { scheduleDailyRecapNotification } from '../services/notifications';
+import { scheduleDailyRecapNotification, cancelDailyRecapNotification } from '../services/notifications';
 
 type WeatherInfo = { temp: number; iconName: string };
+
+function formatHour(hour: number): string {
+  if (hour === 0) return '12 AM';
+  if (hour < 12) return `${hour} AM`;
+  if (hour === 12) return '12 PM';
+  return `${hour - 12} PM`;
+}
 
 function getWeatherIconName(code: number): string {
   if (code === 0) return 'sunny-outline';
@@ -120,6 +130,11 @@ export default function HomeScreen() {
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [paywallVariant, setPaywallVariant] = useState<'soft' | 'hard'>('soft');
 
+  // Notification preference states
+  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [notifHour, setNotifHour] = useState(20);
+  const [showHourPicker, setShowHourPicker] = useState(false);
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUserEmail(user?.email ?? null);
@@ -137,8 +152,14 @@ export default function HomeScreen() {
         }
       }
     });
-    // Schedule daily 8PM recap notification
-    scheduleDailyRecapNotification().catch(() => {});
+    // Load notification prefs and schedule accordingly
+    getNotificationPrefs().then(prefs => {
+      setNotifEnabled(prefs.enabled);
+      setNotifHour(prefs.hour);
+      if (prefs.enabled) {
+        scheduleDailyRecapNotification(prefs.hour).catch(() => {});
+      }
+    });
     // Load tile statuses
     loadStatuses();
     // Load subscription status
@@ -291,6 +312,26 @@ export default function HomeScreen() {
     );
     // Refresh activity status
     loadStatuses();
+  };
+
+  const handleNotifToggle = async (value: boolean) => {
+    setNotifEnabled(value);
+    setShowHourPicker(false);
+    const prefs = { hour: notifHour, enabled: value };
+    await saveNotificationPrefs(prefs);
+    if (value) {
+      scheduleDailyRecapNotification(notifHour).catch(() => {});
+    } else {
+      cancelDailyRecapNotification().catch(() => {});
+    }
+  };
+
+  const handleHourChange = async (hour: number) => {
+    setNotifHour(hour);
+    setShowHourPicker(false);
+    const prefs = { hour, enabled: notifEnabled };
+    await saveNotificationPrefs(prefs);
+    scheduleDailyRecapNotification(hour).catch(() => {});
   };
 
   const handleLogout = async () => {
@@ -616,6 +657,50 @@ export default function HomeScreen() {
                 <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
               </TouchableOpacity>
             )}
+
+            <View style={styles.divider} />
+
+            {/* Notification Settings */}
+            <View style={styles.notifSection}>
+              <View style={styles.notifRow}>
+                <Text style={styles.notifLabel}>Daily Reminder</Text>
+                <Switch
+                  value={notifEnabled}
+                  onValueChange={handleNotifToggle}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#3db88a' }}
+                  thumbColor="#ffffff"
+                />
+              </View>
+              {notifEnabled && (
+                <TouchableOpacity
+                  style={styles.detailRow}
+                  onPress={() => setShowHourPicker(!showHourPicker)}
+                >
+                  <Text style={styles.detailLabel}>Time</Text>
+                  <Text style={styles.detailValue}>{formatHour(notifHour)}</Text>
+                </TouchableOpacity>
+              )}
+              {notifEnabled && showHourPicker && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.hourPickerScroll}
+                  contentContainerStyle={styles.hourPickerContent}
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.hourButton, notifHour === i && styles.hourButtonActive]}
+                      onPress={() => handleHourChange(i)}
+                    >
+                      <Text style={[styles.hourButtonText, notifHour === i && styles.hourButtonTextActive]}>
+                        {formatHour(i)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
 
             <View style={styles.divider} />
 
@@ -1075,6 +1160,48 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  notifSection: {
+    width: '100%',
+    gap: 10,
+  },
+  notifRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  notifLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  hourPickerScroll: {
+    marginTop: 4,
+  },
+  hourPickerContent: {
+    gap: 8,
+    paddingHorizontal: 2,
+  },
+  hourButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  hourButtonActive: {
+    backgroundColor: 'rgba(61, 184, 138, 0.2)',
+    borderColor: '#3db88a',
+  },
+  hourButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  hourButtonTextActive: {
+    color: '#3db88a',
   },
   logoutButton: {
     width: '100%',
