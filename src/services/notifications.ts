@@ -26,17 +26,17 @@ function getNotificationTime(fromNow: Date): Date {
   return new Date(fromNow.getTime() + 1 * 60 * 1000); // 1 min for testing
 }
 
-function getNext8PMTime(): Date {
+function getNextTimeAtHour(hour: number): Date {
   const now = new Date();
-  const next8PM = new Date();
-  next8PM.setHours(20, 0, 0, 0); // 8:00 PM
+  const next = new Date();
+  next.setHours(hour, 0, 0, 0);
 
-  // If it's already past 8 PM today, schedule for tomorrow
-  if (now.getTime() >= next8PM.getTime()) {
-    next8PM.setDate(next8PM.getDate() + 1);
+  // If it's already past the target hour today, schedule for tomorrow
+  if (now.getTime() >= next.getTime()) {
+    next.setDate(next.getDate() + 1);
   }
 
-  return next8PM;
+  return next;
 }
 
 export async function schedulePostWorkoutNotification(session: MovementSession): Promise<void> {
@@ -63,14 +63,14 @@ export async function schedulePostWorkoutNotification(session: MovementSession):
   });
 }
 
-export async function scheduleDailyRecapNotification(): Promise<void> {
+export async function scheduleDailyRecapNotification(hour = 20): Promise<void> {
   const granted = await requestNotificationPermission();
   if (!granted) return;
 
   // Cancel any existing daily recap notification
   await Notifications.cancelScheduledNotificationAsync(DAILY_RECAP_NOTIFICATION_ID).catch(() => {});
 
-  const triggerDate = getNext8PMTime();
+  const triggerDate = getNextTimeAtHour(hour);
 
   // Use a static friendly reminder since we can't generate dynamic content at trigger time
   await Notifications.scheduleNotificationAsync({
