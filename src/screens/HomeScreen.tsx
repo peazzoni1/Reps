@@ -43,6 +43,7 @@ import GoalsModal from '../components/GoalsModal';
 import PaywallModal from '../components/PaywallModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import CheckInQuotaDisplay from '../components/CheckInQuotaDisplay';
+import ProfileEditScreen from './ProfileEditScreen';
 import { getDailyCheckIn } from '../services/anthropic';
 import { getSubscriptionStatus } from '../services/subscriptions';
 import { getCheckInQuota, incrementCheckInCount, canUseCheckIn } from '../services/checkInTracking';
@@ -96,10 +97,13 @@ type UserProfile = {
   last_name?: string;
   sex?: 'male' | 'female' | 'non-binary' | 'prefer-not-to-say';
   birthdate?: string;
+  height_inches?: number;
+  weight_lbs?: number;
 };
 
 export default function HomeScreen() {
   const [profileVisible, setProfileVisible] = useState(false);
+  const [profileEditVisible, setProfileEditVisible] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [coachMessage, setCoachMessage] = useState<DailyCheckInMessage | null>(null);
@@ -135,23 +139,26 @@ export default function HomeScreen() {
   const [notifHour, setNotifHour] = useState(20);
   const [showHourPicker, setShowHourPicker] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      setUserEmail(user?.email ?? null);
+  const loadUserProfile = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUserEmail(user?.email ?? null);
 
-      // Fetch user profile
-      if (user) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('first_name, last_name, sex, birthdate')
-          .eq('user_id', user.id)
-          .single();
+    // Fetch user profile
+    if (user) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('first_name, last_name, sex, birthdate, height_inches, weight_lbs')
+        .eq('user_id', user.id)
+        .single();
 
-        if (profile) {
-          setUserProfile(profile);
-        }
+      if (profile) {
+        setUserProfile(profile);
       }
-    });
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUserProfile();
     // Load notification prefs and schedule accordingly
     getNotificationPrefs().then(prefs => {
       setNotifEnabled(prefs.enabled);
@@ -164,7 +171,7 @@ export default function HomeScreen() {
     loadStatuses();
     // Load subscription status
     loadSubscriptionStatus();
-  }, []);
+  }, [loadUserProfile]);
 
   const loadSubscriptionStatus = useCallback(async () => {
     const [subscription, quota] = await Promise.all([
@@ -605,7 +612,7 @@ export default function HomeScreen() {
             )}
 
             {/* Profile Details */}
-            {userProfile && (userProfile.sex || userProfile.birthdate) && (
+            {userProfile && (userProfile.sex || userProfile.birthdate || userProfile.height_inches || userProfile.weight_lbs) && (
               <View style={styles.profileDetails}>
                 {userProfile.sex && (
                   <View style={styles.detailRow}>
@@ -631,8 +638,36 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 )}
+                {userProfile.height_inches && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Height</Text>
+                    <Text style={styles.detailValue}>
+                      {Math.floor(userProfile.height_inches / 12)}'{userProfile.height_inches % 12}"
+                    </Text>
+                  </View>
+                )}
+                {userProfile.weight_lbs && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Weight</Text>
+                    <Text style={styles.detailValue}>
+                      {userProfile.weight_lbs} lbs
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
+
+            {/* Edit Profile Button */}
+            <TouchableOpacity
+              style={styles.editProfileButton}
+              onPress={() => {
+                setProfileVisible(false);
+                setProfileEditVisible(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={18} color="#3db88a" />
+              <Text style={styles.editProfileText}>Edit Profile</Text>
+            </TouchableOpacity>
 
             {/* Subscription Buttons */}
             {subscriptionTier === 'premium' ? (
@@ -791,6 +826,18 @@ export default function HomeScreen() {
         }}
         variant={paywallVariant}
       />
+
+      {/* Profile Edit Modal */}
+      {profileEditVisible && (
+        <Modal visible={profileEditVisible} animationType="slide" presentationStyle="fullScreen">
+          <ProfileEditScreen
+            onClose={() => setProfileEditVisible(false)}
+            onSave={() => {
+              loadUserProfile();
+            }}
+          />
+        </Modal>
+      )}
     </View>
   );
 }
@@ -1126,6 +1173,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  editProfileButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(61, 184, 138, 0.1)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(61, 184, 138, 0.3)',
+    marginTop: 12,
+  },
+  editProfileText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3db88a',
   },
   divider: {
     width: '100%',
