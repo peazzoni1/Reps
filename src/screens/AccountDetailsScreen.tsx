@@ -15,8 +15,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts, Nunito_700Bold } from '@expo-google-fonts/nunito';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
-import { Spacing } from '../theme';
 
 export default function AccountDetailsScreen() {
   const [firstName, setFirstName] = useState('');
@@ -26,6 +26,14 @@ export default function AccountDetailsScreen() {
   const [lastNameFocused, setLastNameFocused] = useState(false);
   const insets = useSafeAreaInsets();
   const [fontsLoaded] = useFonts({ Nunito_700Bold });
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to sign out.');
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -37,6 +45,8 @@ export default function AccountDetailsScreen() {
       // Build profile data with only provided fields
       const profileData: any = {
         user_id: user.id,
+        sex: null, // Explicitly set to null for initial profile creation
+        birthdate: null,
       };
 
       if (firstName.trim()) profileData.first_name = firstName.trim();
@@ -71,7 +81,7 @@ export default function AccountDetailsScreen() {
           contentContainerStyle={[
             styles.inner,
             {
-              paddingTop: Math.max(insets.top, 40) + 20,
+              paddingTop: Math.max(insets.top, 20),
               paddingBottom: insets.bottom + 40
             }
           ]}
@@ -79,6 +89,19 @@ export default function AccountDetailsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View>
+            {/* Header with Sign Out button */}
+            <View style={styles.header}>
+              <View style={{ width: 28 }} />
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity
+                onPress={handleSignOut}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="log-out-outline" size={24} color="rgba(255, 255, 255, 0.6)" />
+              </TouchableOpacity>
+            </View>
+
             <Text style={[styles.title, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>
               Complete Your Profile
             </Text>
@@ -145,20 +168,25 @@ const styles = StyleSheet.create({
   inner: {
     flexGrow: 1,
     paddingHorizontal: 24,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 16,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 8,
+    marginBottom: 6,
     letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 32,
+    marginBottom: 24,
     letterSpacing: 0.2,
   },
   form: {
