@@ -330,11 +330,12 @@ export default function HomeScreen() {
       setCoachMessage(null);
     }
 
-    const [cached, recentData, dailyNotes, previousMessages] = await Promise.all([
+    const [cached, recentData, dailyNotes, previousMessages, activeGoals] = await Promise.all([
       getCachedDailyMessage(),
       getRecentDailySnapshots(10),
       getAllDailyNotes(),
       getPreviousDailyMessages(),
+      getActiveGoals(),
     ]);
 
     if (key !== loadKeyRef.current) return;
@@ -350,7 +351,7 @@ export default function HomeScreen() {
 
     setCoachLoading(true);
     try {
-      const message = await getDailyCheckIn(recentData, dailyNotes, previousMessages);
+      const message = await getDailyCheckIn(recentData, dailyNotes, previousMessages, activeGoals);
       if (key !== loadKeyRef.current) return;
       if (message) {
         const entry: DailyCheckInMessage = {

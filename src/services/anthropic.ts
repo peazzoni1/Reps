@@ -1,4 +1,4 @@
-import { DailySnapshot, MemoryBullet, MovementSession } from '../types';
+import { DailySnapshot, MemoryBullet, MovementSession, Goal } from '../types';
 import { DailyNote } from './storage';
 import { supabase } from '../lib/supabase';
 
@@ -145,7 +145,8 @@ type PreviousMessage = { date: string; headline: string; body: string };
 export async function getDailyCheckIn(
   recentData: DailySnapshot[],
   dailyNotes: DailyNote[] = [],
-  previousMessages: PreviousMessage[] = []
+  previousMessages: PreviousMessage[] = [],
+  activeGoals: Goal[] = []
 ): Promise<{ headline: string; body: string }> {
   const dataSection =
     recentData.length === 0
@@ -180,6 +181,17 @@ export async function getDailyCheckIn(
           .join('\n')}\n`
       : '';
 
+  const goalsContext =
+    activeGoals.length > 0
+      ? `\nUser's active goals:\n${activeGoals
+          .map((g) => {
+            const progress = g.targetValue > 0 ? Math.round((g.currentProgress / g.targetValue) * 100) : 0;
+            const activityType = g.activityType ? ` (${g.activityType})` : '';
+            return `  - "${g.title}"${activityType}: ${g.currentProgress}/${g.targetValue} ${g.targetPeriod} (${progress}% complete)`;
+          })
+          .join('\n')}\n`
+      : '';
+
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -198,11 +210,12 @@ export async function getDailyCheckIn(
     ? `You are a warm, supportive personal coach. The user hasn't logged any activity in ${daysSinceActive} days. Your job is to write a short re-engagement message shown at the top of their fitness tracking app.
 
 Today's date is ${todayStr}.
-
+${goalsContext}
 How to write this:
 - Be gentle and welcoming — life gets busy, and starting again is what matters. Don't dwell on the gap.
 - Keep it forward-looking and low-pressure. The goal is to make one small step feel easy and inviting.
 - One concrete, gentle suggestion for what to do today is more useful than general encouragement.
+- If they have active goals, you can gently reference them as motivation, but keep it light and non-judgmental.
 - No data to review, so don't invent any. Just write to the situation with warmth.
 - No filler, no hollow cheerleading, no exclamation marks. Avoid "great job", "keep it up", "you've got this".
 
@@ -215,11 +228,12 @@ Today's date is ${todayStr}.
 Here is the user's recent activity data:
 
 ${dataSection}
-${previousContext}
+${previousContext}${goalsContext}
 How to write this:
 - Lead with the most meaningful observation from the data — frame it with curiosity and care, not criticism.
 - When you notice patterns — a tough stretch, back-to-back sessions, low energy — acknowledge them with empathy before offering perspective.
 - When feelings, daily notes, and training data intersect in an interesting way, point it out gently. The notes often reveal mental/emotional state — honor that.
+- If the user has active goals, consider their progress naturally when it's relevant. Celebrate meaningful milestones, acknowledge when they're on track, or gently encourage if they've fallen behind — but don't make every check-in about goals.
 - Every 3–4 days, end with a warm, open-ended question about something specific in the data — something worth reflecting on.
 - Write with continuity — reference recent days naturally, like someone who genuinely cares and has been paying attention.
 - No filler, no hollow cheerleading, no exclamation marks. Avoid "great job", "keep it up", "you've got this". Be warm and real, not performative.
