@@ -32,6 +32,7 @@ serve(async (req) => {
       );
     }
 
+    // Verify JWT signature using Supabase
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -44,7 +45,7 @@ serve(async (req) => {
     } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
-      console.error('Auth error:', userError?.message || 'No user found');
+      console.error('Auth verification failed:', userError?.message || 'No user found');
       return new Response(
         JSON.stringify({ error: 'Unauthorized', details: userError?.message }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

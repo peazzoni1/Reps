@@ -23,12 +23,10 @@ export default function CheckInQuotaDisplay({ quota }: CheckInQuotaDisplayProps)
 
   return (
     <View style={styles.container}>
-      <View style={styles.textRow}>
-        <Text style={styles.label}>Weekly AI Check-ins</Text>
-        <Text style={[styles.count, { color }]}>
-          {quota.remaining} / {quota.total} remaining
-        </Text>
-      </View>
+      <Text style={styles.label}>Weekly AI Check-ins</Text>
+      <Text style={[styles.count, { color }]}>
+        {quota.remaining} / {quota.total} remaining
+      </Text>
       <View style={styles.barBackground}>
         <View
           style={[
@@ -43,13 +41,8 @@ export default function CheckInQuotaDisplay({ quota }: CheckInQuotaDisplayProps)
 
 const styles = StyleSheet.create({
   container: {
-    gap: 8,
+    gap: 6,
     marginTop: 12,
-  },
-  textRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   label: {
     fontSize: 12,
@@ -61,6 +54,7 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 13,
     fontWeight: '700',
+    marginBottom: 2,
   },
   barBackground: {
     height: 6,

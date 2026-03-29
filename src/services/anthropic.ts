@@ -9,24 +9,57 @@ async function callAnthropicViaSupabase(
   messages: { role: string; content: string }[],
   maxTokens: number
 ): Promise<any> {
+  // Always refresh session to ensure we have a valid token
+  console.log('Refreshing session to get fresh token...');
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { session: refreshedSession },
+    error: refreshError,
+  } = await supabase.auth.refreshSession();
 
-  if (!session) {
-    throw new Error('User must be authenticated to use AI features');
+  if (refreshError || !refreshedSession) {
+    console.error('Failed to refresh session:', refreshError);
+
+    // Fallback: try to get existing session
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session) {
+      console.error('Session error:', sessionError);
+      throw new Error('User must be authenticated to use AI features');
+    }
+
+    console.log('Using fallback session');
+    return makeAnthropicRequest(session.access_token, system, messages, maxTokens);
   }
 
+  console.log('Session refreshed, expires at:', refreshedSession.expires_at);
+  console.log('Current time:', Math.floor(Date.now() / 1000));
+
+  return makeAnthropicRequest(refreshedSession.access_token, system, messages, maxTokens);
+}
+
+async function makeAnthropicRequest(
+  accessToken: string,
+  system: string,
+  messages: { role: string; content: string }[],
+  maxTokens: number
+): Promise<any> {
   const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
   if (!anonKey) {
     throw new Error('Supabase anon key not configured');
   }
 
+  console.log('Calling Anthropic proxy');
+  console.log('Function URL:', SUPABASE_FUNCTION_URL);
+  console.log('Access token (first 20 chars):', accessToken.substring(0, 20));
+
   const response = await fetch(SUPABASE_FUNCTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
+      'Authorization': `Bearer ${accessToken}`,
       'apikey': anonKey,
     },
     body: JSON.stringify({
@@ -38,6 +71,7 @@ async function callAnthropicViaSupabase(
 
   if (!response.ok) {
     const error = await response.text();
+    console.error('Edge function error:', error);
     throw new Error(`AI service error ${response.status}: ${error}`);
   }
 
