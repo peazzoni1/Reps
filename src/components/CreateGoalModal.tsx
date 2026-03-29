@@ -81,7 +81,6 @@ export default function CreateGoalModal({
 
   // Load existing goal data if editing
   useEffect(() => {
-    console.log('➕ CreateGoalModal visible prop changed:', visible, 'existingGoal:', existingGoal);
     if (existingGoal) {
       setGoalType(existingGoal.goalType);
       setActivityType(existingGoal.activityType || 'running');
@@ -178,8 +177,6 @@ export default function CreateGoalModal({
     setStep(1);
     onClose();
   };
-
-  console.log('🎨 CreateGoalModal rendering with visible:', visible);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>

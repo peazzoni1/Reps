@@ -67,7 +67,6 @@ export default function GoalsModal({
   }, [loadGoals]);
 
   useEffect(() => {
-    console.log('🎯 GoalsModal visible prop changed:', visible);
     if (visible) {
       loadGoals();
     }
@@ -220,13 +219,7 @@ export default function GoalsModal({
                     <Text style={styles.emptyStateDescription}>
                       Create your first goal to start tracking your fitness journey!
                     </Text>
-                    <TouchableOpacity
-                      style={styles.createButton}
-                      onPress={() => {
-                        console.log('📝 Create Your First Goal button pressed in GoalsModal');
-                        onCreateGoal();
-                      }}
-                    >
+                    <TouchableOpacity style={styles.createButton} onPress={onCreateGoal}>
                       <Text style={styles.createButtonText}>Create Your First Goal</Text>
                     </TouchableOpacity>
                   </>

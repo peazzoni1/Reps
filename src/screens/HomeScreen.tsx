@@ -214,11 +214,6 @@ export default function HomeScreen() {
     loadSubscriptionStatus();
   }, [loadUserProfile]);
 
-  // Debug: Log modal state changes
-  useEffect(() => {
-    console.log('🔍 Modal states - Goals:', goalsModalVisible, 'CreateGoal:', createGoalModalVisible);
-  }, [goalsModalVisible, createGoalModalVisible]);
-
   // Animate the coach card border glow
   useEffect(() => {
     Animated.loop(
@@ -684,11 +679,7 @@ export default function HomeScreen() {
             label="Goals"
             status={goalsStatus}
             color="#8fbc8f"
-            onPress={() => {
-              console.log('🎯 Goals tile pressed - setting goalsModalVisible to true');
-              setGoalsModalVisible(true);
-              console.log('🎯 setGoalsModalVisible(true) called');
-            }}
+            onPress={() => setGoalsModalVisible(true)}
           />
         </View>
 
@@ -933,8 +924,7 @@ export default function HomeScreen() {
         onClose={() => setGoalsModalVisible(false)}
         season={season}
         onCreateGoal={() => {
-          console.log('➕ Create Goal button pressed - closing GoalsModal and opening CreateGoalModal');
-          setGoalsModalVisible(false); // Close GoalsModal first
+          setGoalsModalVisible(false);
           setEditingGoal(null);
           setCreateGoalModalVisible(true);
         }}
