@@ -183,30 +183,37 @@ export default function CreateGoalModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalOverlay}
-      >
+      <View style={styles.modalOverlay}>
         <Pressable style={styles.modalBackdrop} onPress={handleClose} />
-        <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
-          <View style={styles.modalHandle} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingView}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
+            <View style={styles.modalHandle} />
 
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={step === 1 ? handleClose : handleBack}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            {/* Header */}
+            <View style={styles.header}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={step === 1 ? handleClose : handleBack}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="chevron-back" size={24} color="#ffffff" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>
+                {existingGoal ? 'Edit Goal' : `Create Goal (${step}/2)`}
+              </Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={true}
             >
-              <Ionicons name="chevron-back" size={24} color="#ffffff" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>
-              {existingGoal ? 'Edit Goal' : `Create Goal (${step}/2)`}
-            </Text>
-            <View style={{ width: 24 }} />
-          </View>
-
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
             {step === 1 ? (
               <View style={styles.stepContainer}>
                 {/* Goal Type Selection */}
@@ -371,8 +378,9 @@ export default function CreateGoalModal({
               </View>
             )}
           </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -385,6 +393,9 @@ const styles = StyleSheet.create({
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  keyboardAvoidingView: {
+    width: '100%',
   },
   modalSheet: {
     backgroundColor: '#1f2e4f',
