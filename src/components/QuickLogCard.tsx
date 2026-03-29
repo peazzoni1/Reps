@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SeasonTheme, MovementType, FeelingType, WorkoutExercise } from '../types';
 import { MOVEMENT_TYPES, FEELINGS } from '../constants/seasonal';
 import { getCustomTags, addCustomTag, getCustomMovementTypes, addCustomMovementType, ActivityPreference, getActivityPreferences, saveActivityPreferences, toLocalDateStr } from '../services/storage';
+import GoalLinkSection from './GoalLinkSection';
 
 const hexToRgba = (hex: string, alpha: number): string => {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -25,7 +26,7 @@ const hexToRgba = (hex: string, alpha: number): string => {
 
 interface QuickLogCardProps {
   season: SeasonTheme;
-  onSave: (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[]; date: string }) => void;
+  onSave: (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[]; date: string; goalIds?: string[] }) => void;
 }
 
 type ActivityItem = { id: string; label: string; icon: string };
@@ -45,6 +46,7 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
   const [customMovementTypes, setCustomMovementTypes] = useState<Array<{ id: string; label: string; icon: string }>>([]);
   const [showCustomMovementInput, setShowCustomMovementInput] = useState(false);
   const [customMovementInput, setCustomMovementInput] = useState('');
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
 
   const [activityPrefs, setActivityPrefs] = useState<ActivityPreference[]>([]);
   const [customizeVisible, setCustomizeVisible] = useState(false);
@@ -207,6 +209,7 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
         note: note || undefined,
         workoutDetails: validExercises && validExercises.length > 0 ? validExercises : undefined,
         date: selectedDate,
+        goalIds: selectedGoalIds.length > 0 ? selectedGoalIds : undefined,
       });
       resetState();
     }
@@ -589,6 +592,16 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
               blurOnSubmit={true}
               onSubmitEditing={Keyboard.dismiss}
               style={[styles.noteInput, { color: season.text, borderColor: hexToRgba(season.color, 0.2) }]}
+            />
+          )}
+
+          {/* Goal Link Section */}
+          {selectedType && (
+            <GoalLinkSection
+              activityType={selectedType}
+              onGoalsSelected={setSelectedGoalIds}
+              preSelectedGoalIds={selectedGoalIds}
+              season={season}
             />
           )}
         </Animated.View>

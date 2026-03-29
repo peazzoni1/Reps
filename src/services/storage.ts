@@ -9,6 +9,7 @@ const FOOD_ENTRIES_KEY = '@reps_food_entries';
 const ACTIVITY_PREFS_KEY = '@reps_activity_preferences';
 const COACH_SESSIONS_KEY = '@coach_sessions';
 const NOTIFICATION_PREFS_KEY = '@reps_notification_prefs';
+export const GOALS_KEY = '@reps_goals';
 
 // Helper function to generate unique IDs
 const generateId = (): string => {
@@ -22,7 +23,8 @@ export const createMovementSession = async (
   label: string,
   note?: string,
   workoutDetails?: WorkoutExercise[],
-  date?: string
+  date?: string,
+  goalIds?: string[]
 ): Promise<MovementSession> => {
   const sessions = await getAllMovementSessions();
   const newSession: MovementSession = {
@@ -33,6 +35,7 @@ export const createMovementSession = async (
     date: date ? `${date}T12:00:00.000Z` : new Date().toISOString(),
     note,
     workoutDetails,
+    goalIds,
   };
   sessions.push(newSession);
   await AsyncStorage.setItem(MOVEMENT_SESSIONS_KEY, JSON.stringify(sessions));
@@ -513,5 +516,6 @@ export const clearAllData = async (): Promise<void> => {
     ACTIVITY_PREFS_KEY,
     COACH_SESSIONS_KEY,
     DAILY_MESSAGES_HISTORY_KEY,
+    GOALS_KEY,
   ]);
 };

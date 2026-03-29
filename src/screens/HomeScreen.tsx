@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,14 @@ import {
   Modal,
   Alert,
   Switch,
+  Animated,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+
+// Create animated version of LinearGradient
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,6 +45,7 @@ import QuickAccessTile from '../components/QuickAccessTile';
 import FoodLogModal from '../components/FoodLogModal';
 import DailyNotesModal from '../components/DailyNotesModal';
 import GoalsModal from '../components/GoalsModal';
+import CreateGoalModal from '../components/CreateGoalModal';
 import PaywallModal from '../components/PaywallModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import CheckInQuotaDisplay from '../components/CheckInQuotaDisplay';
@@ -48,6 +54,7 @@ import { getDailyCheckIn } from '../services/anthropic';
 import { getSubscriptionStatus } from '../services/subscriptions';
 import { getCheckInQuota, incrementCheckInCount, canUseCheckIn } from '../services/checkInTracking';
 import { scheduleDailyRecapNotification, cancelDailyRecapNotification } from '../services/notifications';
+import { getActiveGoals, updateGoalProgress, Goal } from '../services/goals';
 
 type WeatherInfo = { temp: number; iconName: string };
 
@@ -101,6 +108,35 @@ type UserProfile = {
   weight_lbs?: number;
 };
 
+// Greeting helpers
+function getDayName(): string {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[new Date().getDay()];
+}
+
+function getTimeOfDay(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  if (hour < 21) return 'evening';
+  return 'night';
+}
+
+function getMotivationalPhrase(): string {
+  const phrases = [
+    "let's move today.",
+    "let's make it count.",
+    "let's get stronger.",
+    "let's stay consistent.",
+    "let's push forward.",
+    "let's build momentum.",
+    "let's earn it.",
+    "let's finish strong.",
+  ];
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  return phrases[dayOfYear % phrases.length];
+}
+
 export default function HomeScreen() {
   const [profileVisible, setProfileVisible] = useState(false);
   const [profileEditVisible, setProfileEditVisible] = useState(false);
@@ -116,11 +152,16 @@ export default function HomeScreen() {
   const season = getBlendedTheme();
   const insets = useSafeAreaInsets();
 
+  // Animated glow for AI Coach card border
+  const borderGlowAnim = useRef(new Animated.Value(0)).current;
+
   // Modal visibility states
   const [activityModalVisible, setActivityModalVisible] = useState(false);
   const [foodModalVisible, setFoodModalVisible] = useState(false);
   const [notesModalVisible, setNotesModalVisible] = useState(false);
   const [goalsModalVisible, setGoalsModalVisible] = useState(false);
+  const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 
   // Tile status states
   const [activityStatus, setActivityStatus] = useState('No activities today');
@@ -173,6 +214,29 @@ export default function HomeScreen() {
     loadSubscriptionStatus();
   }, [loadUserProfile]);
 
+  // Debug: Log modal state changes
+  useEffect(() => {
+    console.log('🔍 Modal states - Goals:', goalsModalVisible, 'CreateGoal:', createGoalModalVisible);
+  }, [goalsModalVisible, createGoalModalVisible]);
+
+  // Animate the coach card border glow
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(borderGlowAnim, {
+          toValue: 1,
+          duration: 5000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(borderGlowAnim, {
+          toValue: 0,
+          duration: 5000,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+  }, [borderGlowAnim]);
+
   const loadSubscriptionStatus = useCallback(async () => {
     const [subscription, quota] = await Promise.all([
       getSubscriptionStatus(),
@@ -184,10 +248,11 @@ export default function HomeScreen() {
 
   const loadStatuses = useCallback(async () => {
     try {
-      const [activitySessions, foodEntries, dailyNote] = await Promise.all([
+      const [activitySessions, foodEntries, dailyNote, activeGoals] = await Promise.all([
         getTodayMovementSessions(),
         getTodayFoodEntries(),
         getDailyNote(toLocalDateStr(new Date())),
+        getActiveGoals(),
       ]);
 
       // Activity status
@@ -215,6 +280,16 @@ export default function HomeScreen() {
         setNotesStatus('Note saved');
       } else {
         setNotesStatus('No notes yet');
+      }
+
+      // Goals status
+      if (activeGoals.length === 0) {
+        setGoalsStatus('No goals set');
+      } else {
+        const onTrack = activeGoals.filter(g =>
+          g.currentProgress >= g.targetValue * 0.7
+        ).length;
+        setGoalsStatus(`${onTrack} of ${activeGoals.length} on track`);
       }
     } catch (error) {
       console.error('Error loading statuses:', error);
@@ -308,16 +383,23 @@ export default function HomeScreen() {
     if (key === loadKeyRef.current) setCoachLoading(false);
   }, []);
 
-  const handleSave = async (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[]; date: string }) => {
+  const handleSave = async (entry: { type: MovementType; label: string; feelings: FeelingType[]; note?: string; workoutDetails?: WorkoutExercise[]; date: string; goalIds?: string[] }) => {
     const session = await createMovementSession(
       entry.type,
       entry.feelings,
       entry.label,
       entry.note,
       entry.workoutDetails,
-      entry.date
+      entry.date,
+      entry.goalIds
     );
-    // Refresh activity status
+
+    // Update progress for linked goals
+    if (entry.goalIds && entry.goalIds.length > 0) {
+      await Promise.all(entry.goalIds.map(goalId => updateGoalProgress(goalId)));
+    }
+
+    // Refresh activity and goals status
     loadStatuses();
   };
 
@@ -455,6 +537,21 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Greeting Section */}
+      <View style={styles.greetingSection}>
+        <Text style={[styles.greetingLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>
+          {getDayName().toUpperCase()} {getTimeOfDay().toUpperCase()}
+        </Text>
+        <View style={styles.greetingTitleContainer}>
+          <Text style={[styles.greetingTitle, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>
+            Good {getTimeOfDay()},
+          </Text>
+          <Text style={[styles.greetingTitleAccent, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>
+            {getMotivationalPhrase()}
+          </Text>
+        </View>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.content, { paddingBottom: 40 }]}
@@ -463,8 +560,23 @@ export default function HomeScreen() {
         automaticallyAdjustKeyboardInsets={true}
       >
         {/* AI Coach Daily Check-In */}
-        <View style={styles.coachCard}>
-          <View style={styles.coachCardContent}>
+        <Animated.View style={styles.coachCardWrapper}>
+          <AnimatedLinearGradient
+            colors={['#3db88a', '#7ab8c8', '#3db88a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.coachCardGradient,
+              {
+                opacity: borderGlowAnim.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [0.6, 1, 0.6],
+                }),
+              },
+            ]}
+          >
+            <View style={styles.coachCard}>
+              <View style={styles.coachCardContent}>
             <View style={styles.coachHeader}>
               <Text style={[styles.coachLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>✨ AI COACH · DAILY CHECK-IN</Text>
               <TouchableOpacity
@@ -540,7 +652,9 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
-        </View>
+            </View>
+          </AnimatedLinearGradient>
+        </Animated.View>
 
         {/* Quick Access Tiles */}
         <View style={styles.tileGrid}>
@@ -566,11 +680,15 @@ export default function HomeScreen() {
             onPress={() => setNotesModalVisible(true)}
           />
           <QuickAccessTile
-            icon="🎯"
+            icon="⭐"
             label="Goals"
             status={goalsStatus}
             color="#8fbc8f"
-            onPress={() => setGoalsModalVisible(true)}
+            onPress={() => {
+              console.log('🎯 Goals tile pressed - setting goalsModalVisible to true');
+              setGoalsModalVisible(true);
+              console.log('🎯 setGoalsModalVisible(true) called');
+            }}
           />
         </View>
 
@@ -814,6 +932,35 @@ export default function HomeScreen() {
         visible={goalsModalVisible}
         onClose={() => setGoalsModalVisible(false)}
         season={season}
+        onCreateGoal={() => {
+          console.log('➕ Create Goal button pressed - closing GoalsModal and opening CreateGoalModal');
+          setGoalsModalVisible(false); // Close GoalsModal first
+          setEditingGoal(null);
+          setCreateGoalModalVisible(true);
+        }}
+        onEditGoal={(goal) => {
+          setGoalsModalVisible(false); // Close GoalsModal first
+          setEditingGoal(goal);
+          setCreateGoalModalVisible(true);
+        }}
+      />
+
+      {/* Create/Edit Goal Modal */}
+      <CreateGoalModal
+        visible={createGoalModalVisible}
+        onClose={() => {
+          setCreateGoalModalVisible(false);
+          setEditingGoal(null);
+          setGoalsModalVisible(true); // Re-open GoalsModal
+        }}
+        onSuccess={() => {
+          setCreateGoalModalVisible(false);
+          setEditingGoal(null);
+          loadStatuses();
+          setGoalsModalVisible(true); // Re-open GoalsModal to show the new goal
+        }}
+        season={season}
+        existingGoal={editingGoal}
       />
 
       {/* Paywall Modal */}
@@ -904,6 +1051,37 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.9)',
   },
+  // Greeting Section
+  greetingSection: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    backgroundColor: '#1f2e4f',
+  },
+  greetingLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    color: '#3ee8a0',
+    marginBottom: 8,
+  },
+  greetingTitleContainer: {
+    gap: 0,
+  },
+  greetingTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#ffffff',
+    lineHeight: 38,
+    letterSpacing: -0.5,
+  },
+  greetingTitleAccent: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#3ee8a0',
+    lineHeight: 38,
+    letterSpacing: -0.5,
+  },
   // Content
   scrollView: {
     flex: 1,
@@ -911,16 +1089,20 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
   },
-  coachCard: {
-    borderRadius: 24,
+  coachCardWrapper: {
     marginBottom: 20,
+  },
+  coachCardGradient: {
+    borderRadius: 24,
+    padding: 1.5,
+  },
+  coachCard: {
+    borderRadius: 22.5,
     overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: '#ffffff',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: '#1f2e4f',
     shadowColor: '#3db88a',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
   },

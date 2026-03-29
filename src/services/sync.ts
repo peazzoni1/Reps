@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-import { MovementSession, FoodEntry, CoachSession } from '../types';
+import { MovementSession, FoodEntry, CoachSession, Goal } from '../types';
 
 // ─── Storage keys (mirrors storage.ts) ─────────────────────────────────────
 const MOVEMENT_SESSIONS_KEY = '@reps_movement_sessions';
@@ -10,6 +10,7 @@ const FOOD_ENTRIES_KEY = '@reps_food_entries';
 const ACTIVITY_PREFS_KEY = '@reps_activity_preferences';
 const COACH_SESSIONS_KEY = '@coach_sessions';
 const SUBSCRIPTION_STATUS_KEY = '@reps_subscription_status';
+const GOALS_KEY = '@reps_goals';
 
 // ─── Private helpers ────────────────────────────────────────────────────────
 async function getUserId(): Promise<string | null> {
@@ -31,6 +32,7 @@ function toMovementSession(row: any): MovementSession {
     date: row.date,
     note: row.note ?? undefined,
     workoutDetails: row.workout_details ?? undefined,
+    goalIds: row.goal_ids ?? undefined,
   };
 }
 
@@ -53,6 +55,25 @@ function toCoachSession(row: any): CoachSession {
   };
 }
 
+function toGoal(row: any): Goal {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    description: row.description ?? undefined,
+    goalType: row.goal_type,
+    targetValue: row.target_value,
+    targetPeriod: row.target_period,
+    activityType: row.activity_type ?? undefined,
+    startDate: row.start_date,
+    endDate: row.end_date ?? undefined,
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    currentProgress: row.current_progress,
+    lastCalculated: row.last_calculated,
+  };
+}
+
 // ─── syncFromSupabase ────────────────────────────────────────────────────────
 // Called on app start with await — blocks startup so data is ready before render.
 export async function syncFromSupabase(userId: string): Promise<void> {
@@ -63,12 +84,14 @@ export async function syncFromSupabase(userId: string): Promise<void> {
       { data: coachData },
       { data: prefsData },
       { data: profileData },
+      { data: goalsData },
     ] = await Promise.all([
       supabase.from('movement_sessions').select('*').eq('user_id', userId),
       supabase.from('food_entries').select('*').eq('user_id', userId),
       supabase.from('coach_sessions').select('*').eq('user_id', userId),
       supabase.from('user_preferences').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('user_profiles').select('subscription_tier, subscription_status, subscription_expires_at').eq('user_id', userId).maybeSingle(),
+      supabase.from('goals').select('*').eq('user_id', userId),
     ]);
 
     const pairs: [string, string][] = [];
@@ -81,6 +104,9 @@ export async function syncFromSupabase(userId: string): Promise<void> {
     }
     if (coachData?.length) {
       pairs.push([COACH_SESSIONS_KEY, JSON.stringify(coachData.map(toCoachSession))]);
+    }
+    if (goalsData?.length) {
+      pairs.push([GOALS_KEY, JSON.stringify(goalsData.map(toGoal))]);
     }
     if (prefsData) {
       if (prefsData.custom_tags) {
@@ -128,6 +154,7 @@ export async function syncMovementSession(session: MovementSession): Promise<voi
       date: session.date,
       note: session.note ?? null,
       workout_details: session.workoutDetails ?? null,
+      goal_ids: session.goalIds ?? [],
     });
   } catch (error) {
     console.error('[sync] syncMovementSession error:', error);
@@ -207,5 +234,42 @@ export async function syncUserPreferences(): Promise<void> {
     });
   } catch (error) {
     console.error('[sync] syncUserPreferences error:', error);
+  }
+}
+
+// ─── Goals ───────────────────────────────────────────────────────────────────
+export async function syncGoal(goal: Goal): Promise<void> {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from('goals').upsert({
+      id: goal.id,
+      user_id: userId,
+      title: goal.title,
+      description: goal.description ?? null,
+      goal_type: goal.goalType,
+      target_value: goal.targetValue,
+      target_period: goal.targetPeriod,
+      activity_type: goal.activityType ?? null,
+      start_date: goal.startDate,
+      end_date: goal.endDate ?? null,
+      is_active: goal.isActive,
+      current_progress: goal.currentProgress,
+      last_calculated: goal.lastCalculated,
+      created_at: goal.createdAt,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[sync] syncGoal error:', error);
+  }
+}
+
+export async function removeGoal(id: string): Promise<void> {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from('goals').delete().eq('id', id).eq('user_id', userId);
+  } catch (error) {
+    console.error('[sync] removeGoal error:', error);
   }
 }

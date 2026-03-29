@@ -18,6 +18,7 @@ export interface MovementSession {
   date: string;
   note?: string;
   workoutDetails?: WorkoutExercise[];
+  goalIds?: string[];
 }
 
 export interface SeasonTheme {
@@ -87,4 +88,25 @@ export interface CheckInQuota {
   total: number;
   weekStartDate: string; // YYYY-MM-DD (Sunday)
   isPremium: boolean;
+}
+
+// Goals types
+export type GoalType = 'activity_count' | 'streak' | 'custom';
+export type TargetPeriod = 'daily' | 'weekly' | 'monthly' | 'custom';
+
+export interface Goal {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  goalType: GoalType;
+  targetValue: number;
+  targetPeriod: TargetPeriod;
+  activityType?: MovementType;
+  startDate: string;
+  endDate?: string;
+  isActive: boolean;
+  createdAt: string;
+  currentProgress: number;
+  lastCalculated: string;
 }
