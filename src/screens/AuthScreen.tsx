@@ -13,7 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Defs, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -171,6 +171,35 @@ const ppStyles = StyleSheet.create({
   },
 });
 
+// Email validation helper
+const validateEmail = (email: string): boolean => {
+  // Basic email regex pattern
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+// Password validation helper
+const validatePassword = (password: string): { valid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (password.length < 8) {
+    errors.push('At least 8 characters');
+  }
+
+  if (!/[a-zA-Z]/.test(password)) {
+    errors.push('At least one letter');
+  }
+
+  if (!/[0-9]/.test(password)) {
+    errors.push('At least one number');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+};
+
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -184,6 +213,9 @@ export default function AuthScreen() {
   const insets = useSafeAreaInsets();
 
   const [fontsLoaded] = useFonts({ Nunito_700Bold });
+
+  const isEmailValid = email.trim().length === 0 || validateEmail(email);
+  const passwordValidation = mode === 'signup' ? validatePassword(password) : { valid: true, errors: [] };
 
   useEffect(() => {
     (async () => {
@@ -199,6 +231,22 @@ export default function AuthScreen() {
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) return;
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    // Validate password for sign up
+    if (mode === 'signup') {
+      const validation = validatePassword(password);
+      if (!validation.valid) {
+        Alert.alert('Invalid Password', validation.errors.join('\n• '));
+        return;
+      }
+    }
+
     setLoading(true);
 
     if (mode === 'signin') {
@@ -277,7 +325,11 @@ export default function AuthScreen() {
           {/* Form block */}
           <View style={styles.form}>
             <TextInput
-              style={[styles.input, emailFocused && styles.inputFocused]}
+              style={[
+                styles.input,
+                emailFocused && styles.inputFocused,
+                !isEmailValid && email.trim().length > 0 && styles.inputError,
+              ]}
               placeholder="Email"
               placeholderTextColor="rgba(255, 255, 255, 0.35)"
               value={email}
@@ -288,6 +340,15 @@ export default function AuthScreen() {
               keyboardType="email-address"
               autoComplete="email"
             />
+
+            {/* Email validation hint */}
+            {!isEmailValid && email.trim().length > 0 && (
+              <View style={styles.validationHint}>
+                <Ionicons name="alert-circle" size={14} color="rgba(245, 166, 35, 0.7)" />
+                <Text style={styles.validationHintText}>Please enter a valid email address</Text>
+              </View>
+            )}
+
             <TextInput
               style={[styles.input, passwordFocused && styles.inputFocused]}
               placeholder="Password"
@@ -300,10 +361,41 @@ export default function AuthScreen() {
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             />
 
+            {/* Password requirements for signup */}
+            {mode === 'signup' && password.length > 0 && (
+              <View style={styles.passwordHints}>
+                {passwordValidation.errors.map((error, index) => (
+                  <View key={index} style={styles.passwordHintRow}>
+                    <Ionicons
+                      name="close-circle"
+                      size={14}
+                      color="rgba(245, 166, 35, 0.7)"
+                    />
+                    <Text style={styles.passwordHintText}>{error}</Text>
+                  </View>
+                ))}
+                {passwordValidation.valid && (
+                  <View style={styles.passwordHintRow}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={14}
+                      color="#3db88a"
+                    />
+                    <Text style={[styles.passwordHintText, { color: '#3db88a' }]}>
+                      Password meets requirements
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             <TouchableOpacity
-              style={[styles.button, (!email.trim() || !password.trim()) && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                (!email.trim() || !password.trim() || !isEmailValid || (mode === 'signup' && !passwordValidation.valid)) && styles.buttonDisabled
+              ]}
               onPress={handleSubmit}
-              disabled={loading || !email.trim() || !password.trim()}
+              disabled={loading || !email.trim() || !password.trim() || !isEmailValid || (mode === 'signup' && !passwordValidation.valid)}
               activeOpacity={0.8}
             >
               {loading ? (
@@ -413,6 +505,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  inputError: {
+    borderColor: 'rgba(245, 166, 35, 0.7)',
+    borderWidth: 1,
+  },
+  validationHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: -8,
+  },
+  validationHintText: {
+    fontSize: 12,
+    color: 'rgba(245, 166, 35, 0.7)',
+    lineHeight: 16,
+  },
   button: {
     backgroundColor: '#f5a623',
     borderRadius: 14,
@@ -474,5 +581,19 @@ const styles = StyleSheet.create({
   privacyRow: {
     alignItems: 'center',
     marginTop: 4,
+  },
+  passwordHints: {
+    gap: 6,
+    marginTop: -6,
+  },
+  passwordHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  passwordHintText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.5)',
+    lineHeight: 16,
   },
 });
