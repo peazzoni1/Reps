@@ -17,11 +17,17 @@ async function callAnthropicViaSupabase(
     throw new Error('User must be authenticated to use AI features');
   }
 
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    throw new Error('Supabase anon key not configured');
+  }
+
   const response = await fetch(SUPABASE_FUNCTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': anonKey,
     },
     body: JSON.stringify({
       system,
