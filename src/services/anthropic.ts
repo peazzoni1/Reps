@@ -1,9 +1,42 @@
 import { DailySnapshot, MemoryBullet, MovementSession } from '../types';
 import { DailyNote } from './storage';
+import { supabase } from '../lib/supabase';
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-haiku-4-5-20251001';
-const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
+const SUPABASE_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/anthropic-proxy`;
+
+async function callAnthropicViaSupabase(
+  system: string,
+  messages: { role: string; content: string }[],
+  maxTokens: number
+): Promise<any> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    throw new Error('User must be authenticated to use AI features');
+  }
+
+  const response = await fetch(SUPABASE_FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      system,
+      messages,
+      maxTokens,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`AI service error ${response.status}: ${error}`);
+  }
+
+  return response.json();
+}
 
 type ConversationMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -86,39 +119,22 @@ Safety guidelines:
 export async function generateSessionSummary(
   messages: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<MemoryBullet[]> {
-  if (!API_KEY) throw new Error('EXPO_PUBLIC_ANTHROPIC_API_KEY is not set.');
-
   const transcript = messages
     .map((m) => `${m.role === 'user' ? 'User' : 'Coach'}: ${m.content}`)
     .join('\n');
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 400,
-      system: `You are summarizing a coaching conversation for future reference. Extract only what matters for ongoing coaching: any goals the user mentioned, patterns or insights that came up, how the user described feeling physically or emotionally, and any decisions or intentions they expressed.
+  const json = await callAnthropicViaSupabase(
+    `You are summarizing a coaching conversation for future reference. Extract only what matters for ongoing coaching: any goals the user mentioned, patterns or insights that came up, how the user described feeling physically or emotionally, and any decisions or intentions they expressed.
 
 Return 3-5 concise bullet points as a JSON array. Each item has two fields:
 - "text": the specific bullet point (avoid generic statements)
 - "memoryType": either "persistent" (goals, injuries, preferences, long-term patterns) or "contextual" (mood, stress, weekly feelings, temporary states)
 
 Return only the JSON array with no other text.`,
-      messages: [{ role: 'user', content: transcript }],
-    }),
-  });
+    [{ role: 'user', content: transcript }],
+    400
+  );
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${error}`);
-  }
-
-  const json = await response.json();
   const raw = (json.content?.[0]?.text as string) ?? '[]';
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   return JSON.parse(cleaned) as MemoryBullet[];
@@ -131,8 +147,6 @@ export async function getDailyCheckIn(
   dailyNotes: DailyNote[] = [],
   previousMessages: PreviousMessage[] = []
 ): Promise<{ headline: string; body: string }> {
-  if (!API_KEY) throw new Error('EXPO_PUBLIC_ANTHROPIC_API_KEY is not set.');
-
   const dataSection =
     recentData.length === 0
       ? 'No activity has been logged yet.'
@@ -214,27 +228,12 @@ How to write this:
 Respond with a valid JSON object and nothing else — no markdown, no explanation:
 {"headline": "one warm sentence, max 10 words, capturing the key observation","body": "2–4 sentences of the coaching message"}`;
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 300,
-      system,
-      messages: [{ role: 'user', content: 'Generate my daily check-in.' }],
-    }),
-  });
+  const json = await callAnthropicViaSupabase(
+    system,
+    [{ role: 'user', content: 'Generate my daily check-in.' }],
+    300
+  );
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${error}`);
-  }
-
-  const json = await response.json();
   const raw = (json.content?.[0]?.text as string) ?? '';
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleaned) as { headline: string; body: string };
@@ -248,44 +247,23 @@ export async function sendChatMessage(
   dailyNotes: DailyNote[] = [],
   memorySummaries: MemorySummary[] = []
 ): Promise<string> {
-  if (!API_KEY) {
-    throw new Error('EXPO_PUBLIC_ANTHROPIC_API_KEY is not set.');
-  }
-
   const messages: ConversationMessage[] = [
     ...history,
     { role: 'user', content: userMessage },
   ];
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1024,
-      system: buildSystemPrompt(recentData, dailyNotes, memorySummaries),
-      messages,
-    }),
-  });
+  const json = await callAnthropicViaSupabase(
+    buildSystemPrompt(recentData, dailyNotes, memorySummaries),
+    messages,
+    1024
+  );
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${error}`);
-  }
-
-  const json = await response.json();
   return (json.content?.[0]?.text as string) ?? '';
 }
 
 export async function generatePostWorkoutMessage(
   session: MovementSession
 ): Promise<{ title: string; body: string } | null> {
-  if (!API_KEY) return null;
-
   const details = session.workoutDetails?.length
     ? ` (${session.workoutDetails.map(w => `${w.name}${w.sets ? ` ${w.sets}x${w.reps}` : ''}${w.weight ? ` @ ${w.weight}lb` : ''}`).join(', ')})`
     : '';
@@ -294,27 +272,15 @@ export async function generatePostWorkoutMessage(
   const sessionSummary = `${session.label}${details}${feelings}${note}`;
 
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 120,
-        system: `You are a warm personal coach sending a short push notification to someone who just logged a workout. Write something brief, specific to what they did, and genuinely encouraging — not hollow or generic. No exclamation marks. No "great job" or "keep it up".
+    const json = await callAnthropicViaSupabase(
+      `You are a warm personal coach sending a short push notification to someone who just logged a workout. Write something brief, specific to what they did, and genuinely encouraging — not hollow or generic. No exclamation marks. No "great job" or "keep it up".
 
 Respond with a valid JSON object only:
 {"title": "5-7 words max", "body": "one sentence, specific to their session"}`,
-        messages: [{ role: 'user', content: `The user just logged: ${sessionSummary}` }],
-      }),
-    });
+      [{ role: 'user', content: `The user just logged: ${sessionSummary}` }],
+      120
+    );
 
-    if (!response.ok) return null;
-
-    const json = await response.json();
     const raw = (json.content?.[0]?.text as string) ?? '';
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     return JSON.parse(cleaned) as { title: string; body: string };
@@ -326,8 +292,6 @@ Respond with a valid JSON object only:
 export async function generateDailyRecapMessage(
   todaySnapshot?: DailySnapshot
 ): Promise<{ title: string; body: string } | null> {
-  if (!API_KEY) return null;
-
   const exerciseCount = todaySnapshot?.exercises.length ?? 0;
   const foodCount = todaySnapshot?.food.length ?? 0;
 
@@ -338,17 +302,8 @@ Food: ${foodCount > 0 ? `${foodCount} ${foodCount === 1 ? 'entry' : 'entries'} l
     : 'No activity logged today.';
 
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 120,
-        system: `You are a warm personal coach sending an 8PM daily recap notification. Focus on:
+    const json = await callAnthropicViaSupabase(
+      `You are a warm personal coach sending an 8PM daily recap notification. Focus on:
 - What they accomplished today (if anything)
 - Gently remind them to log anything they might have missed
 - Keep it brief, warm, and actionable
@@ -362,13 +317,10 @@ No exclamation marks. No hollow cheerleading. Be warm and specific.
 
 Respond with a valid JSON object only:
 {"title": "4-6 words", "body": "1-2 sentences max"}`,
-        messages: [{ role: 'user', content: 'Generate the daily recap notification.' }],
-      }),
-    });
+      [{ role: 'user', content: 'Generate the daily recap notification.' }],
+      120
+    );
 
-    if (!response.ok) return null;
-
-    const json = await response.json();
     const raw = (json.content?.[0]?.text as string) ?? '';
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     return JSON.parse(cleaned) as { title: string; body: string };
