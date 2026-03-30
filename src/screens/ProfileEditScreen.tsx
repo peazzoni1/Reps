@@ -50,12 +50,13 @@ export default function ProfileEditScreen({ onClose, onSave }: ProfileEditScreen
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('user_profiles')
         .select('first_name, last_name, sex, birthdate, height_inches, weight_lbs')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
+      // maybeSingle() returns null if no row exists, which is fine for new profiles
       if (profile) {
         setFirstName(profile.first_name || '');
         setLastName(profile.last_name || '');
@@ -127,7 +128,9 @@ export default function ProfileEditScreen({ onClose, onSave }: ProfileEditScreen
       if (height.trim()) profileData.height_inches = Number(height);
       if (weight.trim()) profileData.weight_lbs = Number(weight);
 
-      const { error } = await supabase.from('user_profiles').upsert(profileData);
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert(profileData, { onConflict: 'user_id' });
 
       if (error) throw error;
 

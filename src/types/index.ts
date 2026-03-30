@@ -1,7 +1,7 @@
 export type MovementType = 'strength_training' | 'walking' | 'running' | 'stretching' | 'sports_and_play' | 'other' | 'cycling' | 'yoga' | 'rest_day';
 export type FeelingType = 'strong' | 'alive' | 'peaceful' | 'heavy' | 'grinding' | 'easy' | 'rough' | 'tired';
 export type SeasonType = 'spring' | 'summer' | 'autumn' | 'winter';
-export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'beverage';
 
 export interface WorkoutExercise {
   name: string;

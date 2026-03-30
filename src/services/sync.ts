@@ -96,17 +96,18 @@ export async function syncFromSupabase(userId: string): Promise<void> {
 
     const pairs: [string, string][] = [];
 
+    // Use user-specific keys to isolate data per user
     if (movSessions?.length) {
-      pairs.push([MOVEMENT_SESSIONS_KEY, JSON.stringify(movSessions.map(toMovementSession))]);
+      pairs.push([`${MOVEMENT_SESSIONS_KEY}_${userId}`, JSON.stringify(movSessions.map(toMovementSession))]);
     }
     if (foodEnts?.length) {
-      pairs.push([FOOD_ENTRIES_KEY, JSON.stringify(foodEnts.map(toFoodEntry))]);
+      pairs.push([`${FOOD_ENTRIES_KEY}_${userId}`, JSON.stringify(foodEnts.map(toFoodEntry))]);
     }
     if (coachData?.length) {
-      pairs.push([COACH_SESSIONS_KEY, JSON.stringify(coachData.map(toCoachSession))]);
+      pairs.push([`${COACH_SESSIONS_KEY}_${userId}`, JSON.stringify(coachData.map(toCoachSession))]);
     }
     if (goalsData?.length) {
-      pairs.push([GOALS_KEY, JSON.stringify(goalsData.map(toGoal))]);
+      pairs.push([`${GOALS_KEY}_${userId}`, JSON.stringify(goalsData.map(toGoal))]);
     }
     if (prefsData) {
       if (prefsData.custom_tags) {

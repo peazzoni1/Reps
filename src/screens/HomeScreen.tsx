@@ -190,7 +190,7 @@ export default function HomeScreen() {
         .from('user_profiles')
         .select('first_name, last_name, sex, birthdate, height_inches, weight_lbs')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profile) {
         setUserProfile(profile);
@@ -696,6 +696,10 @@ export default function HomeScreen() {
           />
           <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
             <View style={styles.modalHandle} />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}
+            >
 
             {/* Avatar */}
             <View style={styles.avatar}>
@@ -856,6 +860,7 @@ export default function HomeScreen() {
             <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
               <Text style={styles.deleteText}>Delete account & data</Text>
             </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -970,8 +975,9 @@ export default function HomeScreen() {
         <Modal visible={profileEditVisible} animationType="slide" presentationStyle="fullScreen">
           <ProfileEditScreen
             onClose={() => setProfileEditVisible(false)}
-            onSave={() => {
-              loadUserProfile();
+            onSave={async () => {
+              await loadUserProfile();
+              setProfileVisible(true);
             }}
           />
         </Modal>
@@ -1278,12 +1284,16 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    alignItems: 'center',
-    gap: 14,
     borderTopWidth: 0.5,
     borderLeftWidth: 0.5,
     borderRightWidth: 0.5,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+    maxHeight: '85%',
+  },
+  modalScrollContent: {
+    alignItems: 'center',
+    gap: 14,
+    paddingBottom: 20,
   },
   modalHandle: {
     width: 36,

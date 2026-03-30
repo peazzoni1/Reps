@@ -591,7 +591,7 @@ export default function QuickLogCard({ season, onSave }: QuickLogCardProps) {
               returnKeyType="done"
               blurOnSubmit={true}
               onSubmitEditing={Keyboard.dismiss}
-              style={[styles.noteInput, { color: season.text, borderColor: hexToRgba(season.color, 0.2) }]}
+              style={[styles.noteInput, { color: '#ffffff', borderColor: hexToRgba(season.color, 0.2) }]}
             />
           )}
 

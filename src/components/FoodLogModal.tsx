@@ -8,6 +8,9 @@ import {
   TextInput,
   ActivityIndicator,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MealType } from '../types';
@@ -27,6 +30,7 @@ const MEALS: { id: MealType; label: string; icon: string; color: string }[] = [
   { id: 'lunch', label: 'Lunch', icon: '🌤', color: 'rgba(255, 152, 0, 0.15)' },
   { id: 'dinner', label: 'Dinner', icon: '🌙', color: 'rgba(103, 58, 183, 0.15)' },
   { id: 'snack', label: 'Snack', icon: '🍎', color: 'rgba(244, 67, 54, 0.15)' },
+  { id: 'beverage', label: 'Beverage', icon: '☕', color: 'rgba(33, 150, 243, 0.15)' },
 ];
 
 export default function FoodLogModal({ visible, onClose, onSave, season }: FoodLogModalProps) {
@@ -78,10 +82,21 @@ export default function FoodLogModal({ visible, onClose, onSave, season }: FoodL
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalBackdrop} onPress={handleClose} />
-        <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
-          <View style={styles.modalHandle} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoid}
+        >
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
+            <Pressable onPress={handleClose} hitSlop={{ top: 20, bottom: 20 }}>
+              <View style={styles.modalHandle} />
+            </Pressable>
 
-          <View style={styles.foodCard}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+            >
+              <View style={styles.foodCard}>
             <Text style={styles.foodCardHeader}>🍽️ LOG FOOD</Text>
 
             <View style={styles.foodPillRow}>
@@ -168,8 +183,10 @@ export default function FoodLogModal({ visible, onClose, onSave, season }: FoodL
                 )}
               </TouchableOpacity>
             )}
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -183,6 +200,10 @@ const styles = StyleSheet.create({
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  keyboardAvoid: {
+    width: '100%',
+    maxHeight: '92%',
   },
   modalSheet: {
     backgroundColor: '#1f2e4f',

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MovementSession, MovementType, FeelingType, WorkoutExercise, FoodEntry, MealType, DailySnapshot, ChatMessage, CoachSession, MemoryBullet } from '../types';
 import * as Sync from './sync';
+import { supabase } from '../lib/supabase';
 
 const MOVEMENT_SESSIONS_KEY = '@reps_movement_sessions';
 const CUSTOM_TAGS_KEY = '@reps_custom_tags';
@@ -10,6 +11,19 @@ const ACTIVITY_PREFS_KEY = '@reps_activity_preferences';
 const COACH_SESSIONS_KEY = '@coach_sessions';
 const NOTIFICATION_PREFS_KEY = '@reps_notification_prefs';
 export const GOALS_KEY = '@reps_goals';
+
+// Helper to get user-specific storage key
+const getUserKey = async (baseKey: string): Promise<string> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      return `${baseKey}_${user.id}`;
+    }
+  } catch (error) {
+    console.error('Error getting user for storage key:', error);
+  }
+  return baseKey; // Fallback to base key if no user
+};
 
 // Helper function to generate unique IDs
 const generateId = (): string => {
@@ -38,14 +52,16 @@ export const createMovementSession = async (
     goalIds,
   };
   sessions.push(newSession);
-  await AsyncStorage.setItem(MOVEMENT_SESSIONS_KEY, JSON.stringify(sessions));
+  const key = await getUserKey(MOVEMENT_SESSIONS_KEY);
+  await AsyncStorage.setItem(key, JSON.stringify(sessions));
   Sync.syncMovementSession(newSession);
   return newSession;
 };
 
 export const getAllMovementSessions = async (): Promise<MovementSession[]> => {
   try {
-    const data = await AsyncStorage.getItem(MOVEMENT_SESSIONS_KEY);
+    const key = await getUserKey(MOVEMENT_SESSIONS_KEY);
+    const data = await AsyncStorage.getItem(key);
     return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('Error reading movement sessions:', error);
@@ -72,7 +88,8 @@ export const updateMovementSession = async (
   const index = sessions.findIndex(s => s.id === id);
   if (index === -1) return null;
   sessions[index] = { ...sessions[index], type, feelings, label, note, ...(date ? { date: `${date}T12:00:00.000Z` } : {}) };
-  await AsyncStorage.setItem(MOVEMENT_SESSIONS_KEY, JSON.stringify(sessions));
+  const key = await getUserKey(MOVEMENT_SESSIONS_KEY);
+  await AsyncStorage.setItem(key, JSON.stringify(sessions));
   Sync.syncMovementSession(sessions[index]);
   return sessions[index];
 };
@@ -81,7 +98,8 @@ export const deleteMovementSession = async (id: string): Promise<boolean> => {
   const sessions = await getAllMovementSessions();
   const filtered = sessions.filter(s => s.id !== id);
   if (filtered.length === sessions.length) return false;
-  await AsyncStorage.setItem(MOVEMENT_SESSIONS_KEY, JSON.stringify(filtered));
+  const key = await getUserKey(MOVEMENT_SESSIONS_KEY);
+  await AsyncStorage.setItem(key, JSON.stringify(filtered));
   Sync.removeMovementSession(id);
   return true;
 };
@@ -176,14 +194,16 @@ export const createFoodEntry = async (description: string, meal?: MealType, date
     meal,
   };
   entries.push(newEntry);
-  await AsyncStorage.setItem(FOOD_ENTRIES_KEY, JSON.stringify(entries));
+  const key = await getUserKey(FOOD_ENTRIES_KEY);
+  await AsyncStorage.setItem(key, JSON.stringify(entries));
   Sync.syncFoodEntry(newEntry);
   return newEntry;
 };
 
 export const getAllFoodEntries = async (): Promise<FoodEntry[]> => {
   try {
-    const data = await AsyncStorage.getItem(FOOD_ENTRIES_KEY);
+    const key = await getUserKey(FOOD_ENTRIES_KEY);
+    const data = await AsyncStorage.getItem(key);
     return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('Error reading food entries:', error);
@@ -196,7 +216,8 @@ export const updateFoodEntry = async (id: string, description: string, meal?: Me
   const index = entries.findIndex(e => e.id === id);
   if (index === -1) return null;
   entries[index] = { ...entries[index], description, meal, ...(date ? { date: `${date}T12:00:00.000Z` } : {}) };
-  await AsyncStorage.setItem(FOOD_ENTRIES_KEY, JSON.stringify(entries));
+  const key = await getUserKey(FOOD_ENTRIES_KEY);
+  await AsyncStorage.setItem(key, JSON.stringify(entries));
   Sync.syncFoodEntry(entries[index]);
   return entries[index];
 };
@@ -205,7 +226,8 @@ export const deleteFoodEntry = async (id: string): Promise<boolean> => {
   const entries = await getAllFoodEntries();
   const filtered = entries.filter(e => e.id !== id);
   if (filtered.length === entries.length) return false;
-  await AsyncStorage.setItem(FOOD_ENTRIES_KEY, JSON.stringify(filtered));
+  const key = await getUserKey(FOOD_ENTRIES_KEY);
+  await AsyncStorage.setItem(key, JSON.stringify(filtered));
   Sync.removeFoodEntry(id);
   return true;
 };
