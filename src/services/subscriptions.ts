@@ -13,8 +13,12 @@ let initializationPromise: Promise<void> | null = null;
  * Should be called after user authentication
  */
 export async function initializeRevenueCat(userId: string): Promise<void> {
+  console.log('[RevenueCat] Attempting initialization...');
+  console.log('[RevenueCat] API Key present:', !!REVENUECAT_API_KEY);
+  console.log('[RevenueCat] API Key prefix:', REVENUECAT_API_KEY?.substring(0, 10));
+
   if (!REVENUECAT_API_KEY) {
-    console.error('RevenueCat API key not configured');
+    console.error('[RevenueCat] API key not configured - EXPO_PUBLIC_REVENUECAT_API_KEY is undefined');
     return;
   }
 
@@ -32,14 +36,16 @@ export async function initializeRevenueCat(userId: string): Promise<void> {
   // Start initialization
   initializationPromise = (async () => {
     try {
+      console.log('[RevenueCat] Configuring SDK with userId:', userId);
       await Purchases.configure({
         apiKey: REVENUECAT_API_KEY,
         appUserID: userId
       });
       isInitialized = true;
-      console.log('RevenueCat initialized for user:', userId);
+      console.log('[RevenueCat] ✓ Successfully initialized for user:', userId);
     } catch (error) {
-      console.error('RevenueCat initialization error:', error);
+      console.error('[RevenueCat] ✗ Initialization error:', error);
+      console.error('[RevenueCat] Error details:', JSON.stringify(error, null, 2));
       isInitialized = false;
     } finally {
       initializationPromise = null;
@@ -81,11 +87,14 @@ async function waitForInitialization(timeoutMs: number = 5000): Promise<boolean>
  * Returns subscription tier, status, and expiration info
  */
 export async function getSubscriptionStatus(): Promise<SubscriptionInfo> {
+  console.log('[RevenueCat] Getting subscription status...');
+
   // Wait for initialization (up to 5 seconds)
   const initialized = await waitForInitialization();
 
   if (!initialized) {
-    console.warn('RevenueCat not initialized, returning free tier');
+    console.warn('[RevenueCat] ✗ Not initialized after waiting, returning free tier');
+    console.warn('[RevenueCat] Check that EXPO_PUBLIC_REVENUECAT_API_KEY is set in EAS secrets');
     return {
       tier: 'free',
       status: 'inactive',
@@ -95,21 +104,28 @@ export async function getSubscriptionStatus(): Promise<SubscriptionInfo> {
   }
 
   try {
+    console.log('[RevenueCat] Fetching customer info...');
     const customerInfo: CustomerInfo = await Purchases.getCustomerInfo();
-    const hasPremium = customerInfo.entitlements.active['premium_access'] !== undefined;
+    const hasPremium = customerInfo.entitlements.active['Blue Fitness App Pro'] !== undefined;
+
+    console.log('[RevenueCat] Customer info retrieved');
+    console.log('[RevenueCat] Active entitlements:', Object.keys(customerInfo.entitlements.active));
+    console.log('[RevenueCat] Has Blue Fitness App Pro:', hasPremium);
 
     const subscriptionInfo: SubscriptionInfo = {
       tier: hasPremium ? 'premium' : 'free',
       status: hasPremium ? 'active' : 'inactive',
       expiresAt: hasPremium
-        ? customerInfo.entitlements.active['premium_access'].expirationDate
+        ? customerInfo.entitlements.active['Blue Fitness App Pro'].expirationDate
         : null,
       isActive: hasPremium,
     };
 
+    console.log('[RevenueCat] Subscription status:', subscriptionInfo.tier);
     return subscriptionInfo;
   } catch (error) {
-    console.error('Error fetching subscription status:', error);
+    console.error('[RevenueCat] ✗ Error fetching subscription status:', error);
+    console.error('[RevenueCat] Error details:', JSON.stringify(error, null, 2));
 
     // Return free tier on error
     return {
