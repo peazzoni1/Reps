@@ -5,13 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_400Regular } from '@expo-google-fonts/nunito';
 import HomeScreen from '../screens/HomeScreen';
 import RecapScreen from '../screens/RecapScreen';
-import ChatScreen from '../screens/ChatScreen';
+import ProgressScreen from '../screens/ProgressScreen';
 import { Typography } from '../theme';
 
 export type TabParamList = {
   Today: undefined;
   Log: undefined;
-  Coach: { initialMessage?: string } | undefined;
+  Progress: undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -72,13 +72,13 @@ export default function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Coach"
-        component={ChatScreen}
+        name="Progress"
+        component={ProgressScreen}
         options={{
-          tabBarLabel: 'Coach',
+          tabBarLabel: 'Progress',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'}
+              name={focused ? 'trending-up' : 'trending-up-outline'}
               size={size}
               color={color}
             />

@@ -110,3 +110,35 @@ export interface Goal {
   currentProgress: number;
   lastCalculated: string;
 }
+
+// Progress screen types
+export type AchievementType = 'pr' | 'streak' | 'milestone' | 'consistency';
+
+export interface Achievement {
+  id: string;
+  type: AchievementType;
+  title: string;
+  description: string;
+  date: string;
+  icon: string;
+  exercise?: string; // For PR achievements
+  value?: number; // For PR values
+}
+
+export interface WeeklySummary {
+  weekStart: string; // YYYY-MM-DD
+  weekEnd: string; // YYYY-MM-DD
+  text: string; // AI-generated summary text
+  workoutCount: number;
+  currentStreak: number;
+  topCategory: string | null;
+  totalMinutes: number;
+  topFeeling: FeelingType | null;
+}
+
+export interface PatternData {
+  workoutFrequency: { date: string; count: number }[];
+  exerciseDistribution: { category: string; percentage: number }[];
+  feelingTrends: { feeling: FeelingType; count: number }[];
+  strengthProgression: { exercise: string; data: { date: string; weight: number }[] }[];
+}
