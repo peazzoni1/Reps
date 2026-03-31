@@ -106,15 +106,15 @@ export default function PaywallModal({ visible, onClose, onSuccess, variant }: P
 
           <Text style={styles.title}>Unlock Premium</Text>
           <Text style={styles.subtitle}>
-            Get unlimited AI check-ins and advanced features
+            Get more insights and deeper understanding of your progress
           </Text>
 
           {/* Benefits */}
           <View style={styles.benefitsContainer}>
             {[
-              { icon: '✨', title: 'Unlimited AI Check-Ins', desc: 'Get personalized insights every day' },
-              { icon: '📊', title: 'Advanced Analytics', desc: 'Track progress and trends over time' },
-              { icon: '🎯', title: 'Goal Tracking', desc: 'Set and achieve your fitness goals' },
+              { icon: '✨', title: '2 AI Check-Ins per Day', desc: 'Get detailed daily insights (vs 3/week free)' },
+              { icon: '📊', title: 'Detailed Weekly Summaries', desc: 'Rich narratives with patterns and correlations' },
+              { icon: '🏆', title: 'Lifetime Achievements', desc: 'See all your achievements, not just last 30 days' },
               { icon: '💬', title: 'Priority Support', desc: 'Get help when you need it' },
             ].map((benefit, idx) => (
               <View key={idx} style={styles.benefitRow}>

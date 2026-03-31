@@ -232,10 +232,12 @@ function detectConsistency(
 // ============================================================================
 
 /**
- * Generate AI-powered weekly summary (descriptive only, no advice)
+ * Generate weekly summary (descriptive only, no advice)
+ * Premium users get richer narrative with patterns and correlations
  */
 export async function generateWeeklySummary(
-  weekData: DailySnapshot[]
+  weekData: DailySnapshot[],
+  isPremium: boolean = false
 ): Promise<WeeklySummary> {
   const weekStart = getWeekStart(new Date());
   const weekEnd = getWeekEnd(new Date());
@@ -273,24 +275,78 @@ export async function generateWeeklySummary(
   }
   const topFeeling = (Object.entries(feelingCount).sort((a, b) => b[1] - a[1])[0]?.[0] as FeelingType) || null;
 
-  // Generate AI text summary (descriptive only)
+  // Generate text summary (descriptive only)
+  // Free tier: basic stats + one main pattern
+  // Premium tier: rich narrative with multiple patterns and correlations
   let text = '';
   if (workoutCount === 0) {
     text = 'No workouts logged this week yet.';
+  } else if (isPremium) {
+    // Premium: Rich narrative with multiple insights
+    const sentences: string[] = [];
+
+    // Main stats
+    sentences.push(`You logged ${workoutCount} ${workoutCount === 1 ? 'workout' : 'workouts'} this week, totaling approximately ${totalMinutes} minutes of activity.`);
+
+    // Streak context
+    if (currentStreak > 0) {
+      if (currentStreak >= 7) {
+        sentences.push(`You're maintaining a ${currentStreak}-day workout streak, showing strong consistency.`);
+      } else {
+        sentences.push(`You've logged workouts for ${currentStreak} consecutive ${currentStreak === 1 ? 'day' : 'days'}.`);
+      }
+    }
+
+    // Category distribution (show multiple categories for premium)
+    const topCategories = Object.entries(categoryCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+
+    if (topCategories.length > 0) {
+      if (topCategories.length === 1) {
+        sentences.push(`${topCategories[0][0]} was your sole focus this week.`);
+      } else if (topCategories.length === 2) {
+        sentences.push(`Your training split between ${topCategories[0][0]} (${topCategories[0][1]} ${topCategories[0][1] === 1 ? 'session' : 'sessions'}) and ${topCategories[1][0]} (${topCategories[1][1]} ${topCategories[1][1] === 1 ? 'session' : 'sessions'}).`);
+      } else {
+        sentences.push(`${topCategories[0][0]} was your primary focus (${topCategories[0][1]} ${topCategories[0][1] === 1 ? 'session' : 'sessions'}), with ${topCategories[1][0]} and ${topCategories[2][0]} as supporting work.`);
+      }
+    }
+
+    // Feeling analysis (show distribution for premium)
+    const topFeelings = Object.entries(feelingCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+
+    if (topFeelings.length > 0) {
+      if (topFeelings.length === 1) {
+        sentences.push(`You most commonly felt ${topFeelings[0][0]} during your workouts.`);
+      } else {
+        const feelingsList = topFeelings.map(([f]) => f).join(', ');
+        sentences.push(`Your most common feelings during workouts were ${feelingsList}.`);
+      }
+    }
+
+    // Pattern observation (premium gets an extra insight)
+    const daysWithWorkouts = weekData.filter(d => d.exercises.length > 0).length;
+    if (daysWithWorkouts >= 5) {
+      sentences.push(`You trained on ${daysWithWorkouts} out of 7 days this week, demonstrating high frequency.`);
+    } else if (daysWithWorkouts >= 3) {
+      sentences.push(`You trained on ${daysWithWorkouts} different days this week, maintaining a solid rhythm.`);
+    }
+
+    text = sentences.join(' ');
   } else {
+    // Free tier: Basic stats + one simple pattern
     const parts: string[] = [];
 
     parts.push(`You logged ${workoutCount} ${workoutCount === 1 ? 'workout' : 'workouts'} this week`);
 
-    if (currentStreak > 0) {
-      parts.push(`maintaining a ${currentStreak}-day streak`);
-    }
-
+    // Just show the top one pattern for free users
     if (topCategory) {
       parts.push(`${topCategory} was your primary focus`);
-    }
-
-    if (topFeeling) {
+    } else if (currentStreak > 0) {
+      parts.push(`maintaining a ${currentStreak}-day streak`);
+    } else if (topFeeling) {
       parts.push(`most common feeling: ${capitalize(topFeeling)}`);
     }
 

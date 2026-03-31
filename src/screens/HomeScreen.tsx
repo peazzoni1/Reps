@@ -351,7 +351,11 @@ export default function HomeScreen() {
 
     setCoachLoading(true);
     try {
-      const message = await getDailyCheckIn(recentData, dailyNotes, previousMessages, activeGoals);
+      // Get subscription status to determine message quality tier
+      const subscriptionStatus = await getSubscriptionStatus();
+      const isPremium = subscriptionStatus.isActive;
+
+      const message = await getDailyCheckIn(recentData, dailyNotes, previousMessages, activeGoals, isPremium);
       if (key !== loadKeyRef.current) return;
       if (message) {
         const entry: DailyCheckInMessage = {

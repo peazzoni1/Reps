@@ -24,6 +24,7 @@ import {
   calculatePatterns,
   getRecentAchievements,
 } from '../services/progressAnalytics';
+import { getSubscriptionStatus } from '../services/subscriptions';
 import WeeklySummaryCard from '../components/WeeklySummaryCard';
 import AchievementCard from '../components/AchievementCard';
 import { Typography, Spacing } from '../theme';
@@ -40,23 +41,43 @@ export default function ProgressScreen() {
 
   const loadProgressData = useCallback(async () => {
     try {
-      // Load last 30 days of data
-      const data = await getRecentDailySnapshots(30);
+      // Load subscription status and data in parallel
+      const [subscriptionStatus, data] = await Promise.all([
+        getSubscriptionStatus(),
+        getRecentDailySnapshots(30),
+      ]);
+
+      const isPremium = subscriptionStatus.isActive;
       setRecentData(data);
 
       // Get this week's data (last 7 days)
       const weekData = data.slice(0, 7);
 
-      // Generate weekly summary
-      const summary = await generateWeeklySummary(weekData);
+      // Generate weekly summary (premium users get richer narrative)
+      const summary = await generateWeeklySummary(weekData, isPremium);
       setWeeklySummary(summary);
 
       // Detect new achievements
       await detectAchievements(data);
 
-      // Load recent achievements
-      const recentAchievements = await getRecentAchievements(5);
-      setAchievements(recentAchievements);
+      // Load achievements
+      const allAchievements = await getRecentAchievements(100); // Get more to filter
+
+      // Free users: only show achievements from last 30 days
+      // Premium users: show all achievements (lifetime)
+      let filteredAchievements = allAchievements;
+      if (!isPremium) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const cutoffDate = thirtyDaysAgo.toISOString().split('T')[0];
+
+        filteredAchievements = allAchievements.filter(
+          achievement => achievement.date >= cutoffDate
+        );
+      }
+
+      // Limit to top 5 for display
+      setAchievements(filteredAchievements.slice(0, 5));
 
       // Calculate patterns
       const patternData = calculatePatterns(data);

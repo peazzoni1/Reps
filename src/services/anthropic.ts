@@ -186,7 +186,8 @@ export async function getDailyCheckIn(
   recentData: DailySnapshot[],
   dailyNotes: DailyNote[] = [],
   previousMessages: PreviousMessage[] = [],
-  activeGoals: Goal[] = []
+  activeGoals: Goal[] = [],
+  isPremium: boolean = false
 ): Promise<{ headline: string; body: string }> {
   const dataSection =
     recentData.length === 0
@@ -246,6 +247,22 @@ export async function getDailyCheckIn(
     : null;
   const isInactive = daysSinceActive !== null && daysSinceActive >= 5;
 
+  // Free tier: concise 2-3 sentence observations
+  // Premium tier: detailed narrative with deeper insights and context
+  const lengthGuidance = isPremium
+    ? "4–6 sentences with detailed observations, specific insights, and contextual patterns"
+    : "2–3 sentences of concise observation";
+
+  const detailLevel = isPremium
+    ? `- Provide specific, detailed observations about patterns, progress, and trends
+- Include contextual insights that connect different data points (e.g., how feelings correlate with workout types)
+- Note meaningful progressions or changes over time
+- Reference specific workout details, feelings, and notes when relevant
+- Offer nuanced observations that help the user understand their patterns`
+    : `- Keep it brief and focused on the most important observation
+- Stick to high-level patterns or the most recent activity
+- Avoid deep analysis - just surface-level facts`;
+
   const system = isInactive
     ? `You are providing a daily observation about the user's fitness tracking activity. The user hasn't logged any activity in ${daysSinceActive} days.
 
@@ -258,6 +275,7 @@ How to write this:
 - No prescriptive language: avoid "try", "consider", "you should", "you could", "why not", questions, or implied actions.
 - No filler, no cheerleading, no exclamation marks.
 - Just neutral, warm observations about what you notice in the data.
+${detailLevel}
 
 EXAMPLES OF GOOD (descriptive only):
 "It's been ${daysSinceActive} days since your last logged workout."
@@ -269,7 +287,7 @@ EXAMPLES OF BAD (do not do):
 "Consider logging a quick workout today" ❌ (recommendation)
 
 Respond with a valid JSON object and nothing else — no markdown, no explanation:
-{"headline": "one neutral observation, max 10 words","body": "1–2 sentences of purely descriptive observation"}`
+{"headline": "one neutral observation, max 10 words","body": "${lengthGuidance}"}`
     : `You are providing a daily observation about the user's fitness tracking activity shown at the top of their app.
 
 Today's date is ${todayStr}.
@@ -286,6 +304,7 @@ How to write this:
 - No filler, no cheerleading, no exclamation marks. Avoid "great job", "keep it up", "you've got this".
 - Just neutral, warm observations about what you notice in the data.
 - The user will decide what to do with these observations.
+${detailLevel}
 
 EXAMPLES OF GOOD (descriptive only):
 "You've logged 4 workouts this week, with upper body as your focus."
@@ -301,12 +320,15 @@ EXAMPLES OF BAD (do not do):
 "You're on track to hit your goal!" ❌ (implied future action)
 
 Respond with a valid JSON object and nothing else — no markdown, no explanation:
-{"headline": "one neutral observation, max 10 words","body": "2–3 sentences of purely descriptive observation"}`;
+{"headline": "one neutral observation, max 10 words","body": "${lengthGuidance}"}`;
+
+  // Premium users get more tokens for detailed responses
+  const maxTokens = isPremium ? 600 : 250;
 
   const json = await callAnthropicViaSupabase(
     system,
     [{ role: 'user', content: 'Generate my daily check-in.' }],
-    300
+    maxTokens
   );
 
   const raw = (json.content?.[0]?.text as string) ?? '';

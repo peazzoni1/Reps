@@ -21,11 +21,14 @@ export default function CheckInQuotaDisplay({ quota }: CheckInQuotaDisplayProps)
 
   const color = getColor();
 
+  const label = quota.isPremium ? 'Daily AI Check-ins' : 'Weekly AI Check-ins';
+  const timeframe = quota.isPremium ? 'remaining today' : 'remaining this week';
+
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Weekly AI Check-ins</Text>
+      <Text style={styles.label}>{label}</Text>
       <Text style={[styles.count, { color }]}>
-        {quota.remaining} / {quota.total} remaining
+        {quota.remaining} / {quota.total} {timeframe}
       </Text>
       <View style={styles.barBackground}>
         <View
