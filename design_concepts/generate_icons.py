@@ -174,19 +174,26 @@ def make_option_c():
 
     W = 46
 
-    # Outer arch: purple → coral → gold (IG warm gradient)
+    # Brand colors:
+    #   dark blue  #1A5276  (26, 82, 118)
+    #   med  blue  #2E86C1  (46, 134, 193)
+    #   light blue #5BA4CF  (91, 164, 207)
+    #   teal       #3db88a  (61, 184, 138)
+    #   amber      #f5a623  (245, 166, 35)
+
+    # Outer arch: amber → warm gold sweep
     gradient_arch(img, CX, CY, RADII[0], W,
-                  [(180, 60, 220), (255, 60, 120), (255, 160, 0)])
+                  [(232, 135, 10), (245, 166, 35), (255, 195, 80)])
 
-    # Middle arch: coral → gold → orange
+    # Middle arch: dark blue → mid blue → light blue
     gradient_arch(img, CX, CY, RADII[1], W,
-                  [(255, 80, 100), (255, 140, 30), (255, 200, 0)])
+                  [(26, 82, 118), (46, 134, 193), (91, 164, 207)])
 
-    # Inner arch: teal → cyan → sky
+    # Inner arch: teal → lighter teal sweep
     gradient_arch(img, CX, CY, RADII[2], W,
-                  [(0, 210, 180), (0, 200, 255), (80, 160, 255)])
+                  [(42, 122, 95), (61, 184, 138), (122, 184, 200)])
 
-    save(img, "option_c_ig_gradient.png")
+    save(img, "option_c_brand_gradient.png")
 
 
 # ─── Option D: Bold Minimal ─────────────────────────────────────────────────
