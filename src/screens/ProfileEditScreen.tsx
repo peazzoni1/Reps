@@ -206,7 +206,7 @@ export default function ProfileEditScreen({ onClose, onSave }: ProfileEditScreen
           </View>
 
           <Text style={styles.subtitle}>
-            All fields are optional. This information helps personalize your experience.
+            This information helps personalize your experience.
           </Text>
 
           <View style={styles.form}>

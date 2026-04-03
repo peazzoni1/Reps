@@ -125,7 +125,7 @@ export default function AccountDetailsScreen() {
 
             <TextInput
               style={[styles.input, lastNameFocused && styles.inputFocused]}
-              placeholder="Last Name (Optional)"
+              placeholder="Last Name"
               placeholderTextColor="rgba(255, 255, 255, 0.35)"
               value={lastName}
               onChangeText={setLastName}
