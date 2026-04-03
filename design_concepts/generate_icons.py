@@ -172,7 +172,7 @@ def make_option_b():
 def make_option_c():
     img = gradient_bg((18, 28, 80), (10, 18, 55))
 
-    W = 46
+    W = 52
 
     # Brand colors:
     #   dark blue  #1A5276  (26, 82, 118)
@@ -183,17 +183,17 @@ def make_option_c():
     #
     # Each arch sweeps across two brand hue families for IG-style vibrancy.
 
-    # Outer: burnt orange → amber → gold → sunny yellow (4-stop warm sweep)
+    # Outer: deep red-orange → burnt orange → amber → gold → electric yellow (5-stop)
     gradient_arch(img, CX, CY, RADII[0], W,
-                  [(200, 80, 5), (245, 166, 35), (255, 210, 70), (255, 230, 50)])
+                  [(215, 45, 5), (225, 100, 5), (245, 166, 35), (255, 215, 55), (255, 240, 20)])
 
-    # Middle: dark teal → vivid teal → sky blue → bright periwinkle
+    # Middle: vivid lime-teal → bright teal → teal-blue → sky → electric periwinkle (5-stop)
     gradient_arch(img, CX, CY, RADII[1], W,
-                  [(20, 120, 95), (61, 184, 138), (91, 164, 207), (110, 170, 235)])
+                  [(10, 190, 120), (61, 200, 155), (60, 175, 215), (80, 150, 240), (55, 115, 225)])
 
-    # Inner: periwinkle → medium blue → vivid teal → bright green-teal
+    # Inner: strong blue → medium blue → vivid teal → bright mint (5-stop)
     gradient_arch(img, CX, CY, RADII[2], W,
-                  [(80, 130, 215), (46, 134, 193), (61, 184, 138), (50, 200, 140)])
+                  [(55, 90, 230), (46, 134, 193), (50, 175, 155), (61, 210, 145), (30, 185, 110)])
 
     save(img, "option_c_brand_gradient.png")
 
