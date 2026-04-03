@@ -183,17 +183,17 @@ def make_option_c():
     #
     # Each arch sweeps across two brand hue families for IG-style vibrancy.
 
-    # Outer: deep orange → amber → bright gold (warm family, wider brightness range)
+    # Outer: burnt orange → amber → gold → sunny yellow (4-stop warm sweep)
     gradient_arch(img, CX, CY, RADII[0], W,
-                  [(210, 105, 5), (245, 166, 35), (255, 215, 80)])
+                  [(200, 80, 5), (245, 166, 35), (255, 210, 70), (255, 230, 50)])
 
-    # Middle: teal → sky blue → medium blue  (warm-cool crossover)
+    # Middle: dark teal → vivid teal → sky blue → bright periwinkle
     gradient_arch(img, CX, CY, RADII[1], W,
-                  [(61, 184, 138), (91, 164, 207), (46, 134, 193)])
+                  [(20, 120, 95), (61, 184, 138), (91, 164, 207), (110, 170, 235)])
 
-    # Inner: medium blue → teal → dark teal  (cool-warm crossover, mirrored)
+    # Inner: periwinkle → medium blue → vivid teal → bright green-teal
     gradient_arch(img, CX, CY, RADII[2], W,
-                  [(46, 134, 193), (61, 184, 138), (32, 110, 80)])
+                  [(80, 130, 215), (46, 134, 193), (61, 184, 138), (50, 200, 140)])
 
     save(img, "option_c_brand_gradient.png")
 
