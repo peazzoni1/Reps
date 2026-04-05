@@ -19,7 +19,7 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FeelingType, MovementType, WorkoutExercise, SubscriptionTier, CheckInQuota, FoodChallenge, FoodChallengeCompletion } from '../types';
+import { FeelingType, MovementType, WorkoutExercise, SubscriptionTier, FoodChallenge, FoodChallengeCompletion } from '../types';
 import {
   createMovementSession,
   getRecentDailySnapshots,
@@ -50,12 +50,11 @@ import GoalsModal from '../components/GoalsModal';
 import CreateGoalModal from '../components/CreateGoalModal';
 import PaywallModal from '../components/PaywallModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
-import CheckInQuotaDisplay from '../components/CheckInQuotaDisplay';
 import ProfileEditScreen from './ProfileEditScreen';
 import { getDailyCheckIn } from '../services/anthropic';
 import { getSubscriptionStatus } from '../services/subscriptions';
 import { getCheckInQuota, incrementCheckInCount, canUseCheckIn } from '../services/checkInTracking';
-import { scheduleDailyRecapNotification, cancelDailyRecapNotification } from '../services/notifications';
+import { scheduleDailyRecapNotification, cancelDailyRecapNotification, scheduleDailyChallengeNotification } from '../services/notifications';
 import { getActiveGoals, updateGoalProgress, Goal } from '../services/goals';
 import { getChallengeForDate } from '../constants/foodChallenges';
 import {
@@ -118,34 +117,6 @@ type UserProfile = {
   weight_lbs?: number;
 };
 
-// Greeting helpers
-function getDayName(): string {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days[new Date().getDay()];
-}
-
-function getTimeOfDay(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'morning';
-  if (hour < 17) return 'afternoon';
-  if (hour < 21) return 'evening';
-  return 'night';
-}
-
-function getMotivationalPhrase(): string {
-  const phrases = [
-    "let's move today.",
-    "let's make it count.",
-    "let's get stronger.",
-    "let's stay consistent.",
-    "let's push forward.",
-    "let's build momentum.",
-    "let's earn it.",
-    "let's finish strong.",
-  ];
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  return phrases[dayOfYear % phrases.length];
-}
 
 export default function HomeScreen() {
   const [profileVisible, setProfileVisible] = useState(false);
@@ -181,7 +152,6 @@ export default function HomeScreen() {
 
   // Subscription states
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
-  const [checkInQuota, setCheckInQuota] = useState<CheckInQuota | null>(null);
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [paywallVariant, setPaywallVariant] = useState<'soft' | 'hard'>('soft');
 
@@ -235,6 +205,7 @@ export default function HomeScreen() {
       setNotifHour(prefs.hour);
       if (prefs.enabled) {
         scheduleDailyRecapNotification(prefs.hour).catch(() => {});
+        scheduleDailyChallengeNotification().catch(() => {});
       }
     });
     // Load tile statuses
@@ -264,12 +235,8 @@ export default function HomeScreen() {
   }, [borderGlowAnim]);
 
   const loadSubscriptionStatus = useCallback(async () => {
-    const [subscription, quota] = await Promise.all([
-      getSubscriptionStatus(),
-      getCheckInQuota(),
-    ]);
+    const subscription = await getSubscriptionStatus();
     setSubscriptionTier(subscription.tier);
-    setCheckInQuota(quota);
   }, []);
 
   const handleChallengeComplete = useCallback(async () => {
@@ -416,11 +383,8 @@ export default function HomeScreen() {
         // Increment check-in count after successful generation
         await incrementCheckInCount();
 
-        // Reload quota to update UI
-        const updatedQuota = await getCheckInQuota();
-        setCheckInQuota(updatedQuota);
-
         // Show soft paywall if this was the last free check-in
+        const updatedQuota = await getCheckInQuota();
         if (!updatedQuota.isPremium && updatedQuota.remaining === 0) {
           setPaywallVariant('soft');
           setPaywallVisible(true);
