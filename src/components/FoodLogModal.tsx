@@ -21,8 +21,9 @@ import { Spacing, BorderRadius } from '../theme';
 interface FoodLogModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (savedEntryId: string) => void;
   season: SeasonTheme;
+  challengeId?: string;
 }
 
 const MEALS: { id: MealType; label: string; icon: string; color: string }[] = [
@@ -33,7 +34,7 @@ const MEALS: { id: MealType; label: string; icon: string; color: string }[] = [
   { id: 'beverage', label: 'Beverage', icon: '☕', color: 'rgba(33, 150, 243, 0.15)' },
 ];
 
-export default function FoodLogModal({ visible, onClose, onSave, season }: FoodLogModalProps) {
+export default function FoodLogModal({ visible, onClose, onSave, season, challengeId: _challengeId }: FoodLogModalProps) {
   const insets = useSafeAreaInsets();
   const todayStr = toLocalDateStr(new Date());
   const yesterdayDate = new Date();
@@ -57,13 +58,13 @@ export default function FoodLogModal({ visible, onClose, onSave, season }: FoodL
     const desc = foodDescription.trim();
     if (!desc) return;
     setFoodSaving(true);
-    await createFoodEntry(desc, selectedFoodMeal ?? undefined, selectedFoodDate);
+    const entry = await createFoodEntry(desc, selectedFoodMeal ?? undefined, selectedFoodDate);
     setFoodSaving(false);
     setFoodDescription('');
     setSelectedFoodMeal(null);
     setSelectedFoodDate(todayStr);
     setShowMoreFoodDates(false);
-    onSave();
+    onSave(entry.id);
     onClose();
   };
 

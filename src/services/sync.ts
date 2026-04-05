@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-import { MovementSession, FoodEntry, CoachSession, Goal } from '../types';
+import { MovementSession, FoodEntry, CoachSession, Goal, FoodChallengeCompletion } from '../types';
 
 // ─── Storage keys (mirrors storage.ts) ─────────────────────────────────────
 const MOVEMENT_SESSIONS_KEY = '@reps_movement_sessions';
@@ -11,6 +11,7 @@ const ACTIVITY_PREFS_KEY = '@reps_activity_preferences';
 const COACH_SESSIONS_KEY = '@coach_sessions';
 const SUBSCRIPTION_STATUS_KEY = '@reps_subscription_status';
 const GOALS_KEY = '@reps_goals';
+const FOOD_CHALLENGE_COMPLETIONS_KEY = '@reps_food_challenge_completions';
 
 // ─── Private helpers ────────────────────────────────────────────────────────
 async function getUserId(): Promise<string | null> {
@@ -74,6 +75,16 @@ function toGoal(row: any): Goal {
   };
 }
 
+function toFoodChallengeCompletion(row: any): FoodChallengeCompletion {
+  return {
+    id: row.id,
+    challengeId: row.challenge_id,
+    date: row.date,
+    completedAt: row.completed_at,
+    linkedFoodEntryId: row.linked_food_entry_id ?? undefined,
+  };
+}
+
 // ─── syncFromSupabase ────────────────────────────────────────────────────────
 // Called on app start with await — blocks startup so data is ready before render.
 export async function syncFromSupabase(userId: string): Promise<void> {
@@ -85,6 +96,7 @@ export async function syncFromSupabase(userId: string): Promise<void> {
       { data: prefsData },
       { data: profileData },
       { data: goalsData },
+      { data: foodChallengeData },
     ] = await Promise.all([
       supabase.from('movement_sessions').select('*').eq('user_id', userId),
       supabase.from('food_entries').select('*').eq('user_id', userId),
@@ -92,6 +104,7 @@ export async function syncFromSupabase(userId: string): Promise<void> {
       supabase.from('user_preferences').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('user_profiles').select('subscription_tier, subscription_status, subscription_expires_at').eq('user_id', userId).maybeSingle(),
       supabase.from('goals').select('*').eq('user_id', userId),
+      supabase.from('food_challenge_completions').select('*').eq('user_id', userId),
     ]);
 
     const pairs: [string, string][] = [];
@@ -108,6 +121,9 @@ export async function syncFromSupabase(userId: string): Promise<void> {
     }
     if (goalsData?.length) {
       pairs.push([`${GOALS_KEY}_${userId}`, JSON.stringify(goalsData.map(toGoal))]);
+    }
+    if (foodChallengeData?.length) {
+      pairs.push([`${FOOD_CHALLENGE_COMPLETIONS_KEY}_${userId}`, JSON.stringify(foodChallengeData.map(toFoodChallengeCompletion))]);
     }
     if (prefsData) {
       if (prefsData.custom_tags) {
@@ -272,5 +288,33 @@ export async function removeGoal(id: string): Promise<void> {
     await supabase.from('goals').delete().eq('id', id).eq('user_id', userId);
   } catch (error) {
     console.error('[sync] removeGoal error:', error);
+  }
+}
+
+// ─── Food Challenge Completions ──────────────────────────────────────────────
+export async function syncFoodChallengeCompletion(completion: FoodChallengeCompletion): Promise<void> {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from('food_challenge_completions').upsert({
+      id: completion.id,
+      user_id: userId,
+      challenge_id: completion.challengeId,
+      date: completion.date,
+      completed_at: completion.completedAt,
+      linked_food_entry_id: completion.linkedFoodEntryId ?? null,
+    });
+  } catch (error) {
+    console.error('[sync] syncFoodChallengeCompletion error:', error);
+  }
+}
+
+export async function removeFoodChallengeCompletion(id: string): Promise<void> {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from('food_challenge_completions').delete().eq('id', id).eq('user_id', userId);
+  } catch (error) {
+    console.error('[sync] removeFoodChallengeCompletion error:', error);
   }
 }

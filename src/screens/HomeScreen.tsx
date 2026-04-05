@@ -19,7 +19,7 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FeelingType, MovementType, WorkoutExercise, SubscriptionTier, CheckInQuota } from '../types';
+import { FeelingType, MovementType, WorkoutExercise, SubscriptionTier, CheckInQuota, FoodChallenge, FoodChallengeCompletion } from '../types';
 import {
   createMovementSession,
   getRecentDailySnapshots,
@@ -43,6 +43,8 @@ import { supabase } from '../lib/supabase';
 import QuickLogCard from '../components/QuickLogCard';
 import QuickAccessTile from '../components/QuickAccessTile';
 import FoodLogModal from '../components/FoodLogModal';
+import DailyFoodChallengeCard from '../components/DailyFoodChallengeCard';
+import FoodChallengeCompletionPrompt from '../components/FoodChallengeCompletionPrompt';
 import DailyNotesModal from '../components/DailyNotesModal';
 import GoalsModal from '../components/GoalsModal';
 import CreateGoalModal from '../components/CreateGoalModal';
@@ -55,6 +57,14 @@ import { getSubscriptionStatus } from '../services/subscriptions';
 import { getCheckInQuota, incrementCheckInCount, canUseCheckIn } from '../services/checkInTracking';
 import { scheduleDailyRecapNotification, cancelDailyRecapNotification } from '../services/notifications';
 import { getActiveGoals, updateGoalProgress, Goal } from '../services/goals';
+import { getChallengeForDate } from '../constants/foodChallenges';
+import {
+  getTodayFoodChallengeCompletion,
+  createFoodChallengeCompletion,
+  linkFoodEntryToCompletion,
+  calculateFoodChallengeStreak,
+} from '../services/foodChallengeStorage';
+import { checkFoodChallengeAchievements } from '../services/progressAnalytics';
 
 type WeatherInfo = { temp: number; iconName: string };
 
@@ -180,6 +190,13 @@ export default function HomeScreen() {
   const [notifHour, setNotifHour] = useState(20);
   const [showHourPicker, setShowHourPicker] = useState(false);
 
+  // Food challenge states
+  const [todayChallenge, setTodayChallenge] = useState<FoodChallenge | null>(null);
+  const [todayChallengeCompletion, setTodayChallengeCompletion] = useState<FoodChallengeCompletion | null>(null);
+  const [challengeStreak, setChallengeStreak] = useState(0);
+  const [challengePromptVisible, setChallengePromptVisible] = useState(false);
+  const [pendingChallengeCompletion, setPendingChallengeCompletion] = useState<FoodChallengeCompletion | null>(null);
+
   const loadUserProfile = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserEmail(user?.email ?? null);
@@ -198,6 +215,18 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadChallengeState = useCallback(async () => {
+    const dateStr = toLocalDateStr(new Date());
+    const challenge = getChallengeForDate(dateStr);
+    const [completion, streak] = await Promise.all([
+      getTodayFoodChallengeCompletion(),
+      calculateFoodChallengeStreak(),
+    ]);
+    setTodayChallenge(challenge);
+    setTodayChallengeCompletion(completion);
+    setChallengeStreak(streak);
+  }, []);
+
   useEffect(() => {
     loadUserProfile();
     // Load notification prefs and schedule accordingly
@@ -212,7 +241,9 @@ export default function HomeScreen() {
     loadStatuses();
     // Load subscription status
     loadSubscriptionStatus();
-  }, [loadUserProfile]);
+    // Load food challenge state
+    loadChallengeState();
+  }, [loadUserProfile, loadChallengeState]);
 
   // Animate the coach card border glow
   useEffect(() => {
@@ -239,6 +270,22 @@ export default function HomeScreen() {
     ]);
     setSubscriptionTier(subscription.tier);
     setCheckInQuota(quota);
+  }, []);
+
+  const handleChallengeComplete = useCallback(async () => {
+    if (!todayChallenge || todayChallengeCompletion) return;
+    const completion = await createFoodChallengeCompletion(todayChallenge.id);
+    setTodayChallengeCompletion(completion);
+    const newStreak = await calculateFoodChallengeStreak();
+    setChallengeStreak(newStreak);
+    await checkFoodChallengeAchievements(newStreak);
+    setPendingChallengeCompletion(completion);
+    setChallengePromptVisible(true);
+  }, [todayChallenge, todayChallengeCompletion]);
+
+  const handleChallengeAddFood = useCallback(() => {
+    setChallengePromptVisible(false);
+    setFoodModalVisible(true);
   }, []);
 
   const loadStatuses = useCallback(async () => {
@@ -656,6 +703,16 @@ export default function HomeScreen() {
           </AnimatedLinearGradient>
         </Animated.View>
 
+        {/* Daily Food Challenge */}
+        {todayChallenge && (
+          <DailyFoodChallengeCard
+            challenge={todayChallenge}
+            completion={todayChallengeCompletion}
+            streak={challengeStreak}
+            onComplete={handleChallengeComplete}
+          />
+        )}
+
         {/* Quick Access Tiles */}
         <View style={styles.tileGrid}>
           <QuickAccessTile
@@ -911,12 +968,30 @@ export default function HomeScreen() {
       <FoodLogModal
         visible={foodModalVisible}
         onClose={() => setFoodModalVisible(false)}
-        onSave={() => {
+        onSave={async (savedEntryId: string) => {
           setFoodModalVisible(false);
           loadStatuses();
+          if (pendingChallengeCompletion) {
+            await linkFoodEntryToCompletion(pendingChallengeCompletion.id, savedEntryId);
+            setPendingChallengeCompletion(null);
+          }
         }}
         season={season}
       />
+
+      {/* Food Challenge Completion Prompt */}
+      {todayChallenge && (
+        <FoodChallengeCompletionPrompt
+          visible={challengePromptVisible}
+          challengeText={todayChallenge.text}
+          streak={challengeStreak}
+          onAddFoodLog={handleChallengeAddFood}
+          onSkip={() => {
+            setChallengePromptVisible(false);
+            setPendingChallengeCompletion(null);
+          }}
+        />
+      )}
 
       {/* Daily Notes Modal */}
       <DailyNotesModal

@@ -11,6 +11,7 @@ const ACTIVITY_PREFS_KEY = '@reps_activity_preferences';
 const COACH_SESSIONS_KEY = '@coach_sessions';
 const NOTIFICATION_PREFS_KEY = '@reps_notification_prefs';
 export const GOALS_KEY = '@reps_goals';
+const FOOD_CHALLENGE_COMPLETIONS_KEY = '@reps_food_challenge_completions';
 
 // Helper to get user-specific storage key
 const getUserKey = async (baseKey: string): Promise<string> => {
@@ -530,6 +531,9 @@ export const saveNotificationPrefs = async (prefs: NotificationPrefs): Promise<v
 
 // Utility: clear all data
 export const clearAllData = async (): Promise<void> => {
+  // Also clear any user-specific keys by scanning all keys
+  const allKeys = await AsyncStorage.getAllKeys();
+  const challengeKeys = allKeys.filter(k => k.startsWith(FOOD_CHALLENGE_COMPLETIONS_KEY));
   await AsyncStorage.multiRemove([
     MOVEMENT_SESSIONS_KEY,
     CUSTOM_TAGS_KEY,
@@ -539,5 +543,7 @@ export const clearAllData = async (): Promise<void> => {
     COACH_SESSIONS_KEY,
     DAILY_MESSAGES_HISTORY_KEY,
     GOALS_KEY,
+    FOOD_CHALLENGE_COMPLETIONS_KEY,
+    ...challengeKeys,
   ]);
 };

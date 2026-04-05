@@ -16,6 +16,7 @@ import {
   Achievement,
   WeeklySummary,
   PatternData,
+  FoodChallengeCompletion,
 } from '../types';
 import { getRecentDailySnapshots } from '../services/storage';
 import {
@@ -25,8 +26,13 @@ import {
   getRecentAchievements,
 } from '../services/progressAnalytics';
 import { getSubscriptionStatus } from '../services/subscriptions';
+import {
+  getAllFoodChallengeCompletions,
+  calculateFoodChallengeStreak,
+} from '../services/foodChallengeStorage';
 import WeeklySummaryCard from '../components/WeeklySummaryCard';
 import AchievementCard from '../components/AchievementCard';
+import FoodChallengeStreakRow from '../components/FoodChallengeStreakRow';
 import { Typography, Spacing } from '../theme';
 
 export default function ProgressScreen() {
@@ -38,14 +44,20 @@ export default function ProgressScreen() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [patterns, setPatterns] = useState<PatternData | null>(null);
   const [recentData, setRecentData] = useState<DailySnapshot[]>([]);
+  const [foodChallengeStreak, setFoodChallengeStreak] = useState(0);
+  const [foodChallengeCompletions, setFoodChallengeCompletions] = useState<FoodChallengeCompletion[]>([]);
 
   const loadProgressData = useCallback(async () => {
     try {
-      // Load subscription status and data in parallel
-      const [subscriptionStatus, data] = await Promise.all([
+      // Load subscription status, snapshots, and food challenge data in parallel
+      const [subscriptionStatus, data, fcStreak, fcCompletions] = await Promise.all([
         getSubscriptionStatus(),
         getRecentDailySnapshots(30),
+        calculateFoodChallengeStreak(),
+        getAllFoodChallengeCompletions(),
       ]);
+      setFoodChallengeStreak(fcStreak);
+      setFoodChallengeCompletions(fcCompletions);
 
       const isPremium = subscriptionStatus.isActive;
       setRecentData(data);
@@ -123,6 +135,21 @@ export default function ProgressScreen() {
       >
         {/* Weekly Summary */}
         <WeeklySummaryCard summary={weeklySummary} loading={loading} />
+
+        {/* Food Challenge Streak */}
+        {(foodChallengeStreak > 0 || foodChallengeCompletions.length > 0) && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Food Challenge Streak</Text>
+            </View>
+            <View style={styles.patternCard}>
+              <Text style={styles.patternValue}>
+                🥗 {foodChallengeStreak} day{foodChallengeStreak !== 1 ? 's' : ''} current streak
+              </Text>
+              <FoodChallengeStreakRow completions={foodChallengeCompletions} />
+            </View>
+          </View>
+        )}
 
         {/* Achievements Section */}
         {achievements.length > 0 && (

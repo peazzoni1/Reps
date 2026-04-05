@@ -564,3 +564,47 @@ export async function getRecentAchievements(
   const all = await getStoredAchievements();
   return all.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
 }
+
+// ============================================================================
+// Food Challenge Achievements
+// ============================================================================
+
+const FOOD_CHALLENGE_MILESTONES: { streak: number; id: string; title: string; description: string; icon: string }[] = [
+  { streak: 1,  id: 'food-challenge-first',      title: 'First Food Challenge!',    description: 'You completed your first daily food challenge',              icon: '🌱' },
+  { streak: 3,  id: 'food-challenge-streak-3',   title: '3-Day Food Streak',        description: "You've completed food challenges 3 days in a row",           icon: '🥗' },
+  { streak: 7,  id: 'food-challenge-streak-7',   title: 'Week of Mindful Eating',   description: "You've completed food challenges 7 days in a row",           icon: '🥑' },
+  { streak: 14, id: 'food-challenge-streak-14',  title: 'Two-Week Food Streak',     description: "You've completed food challenges 14 days in a row",          icon: '🥦' },
+  { streak: 30, id: 'food-challenge-streak-30',  title: '30-Day Food Champion',     description: "You've completed food challenges for 30 consecutive days",   icon: '🏆' },
+];
+
+export async function detectFoodChallengeAchievements(
+  currentStreak: number
+): Promise<Achievement[]> {
+  const existingAchievements = await getStoredAchievements();
+  const existingIds = new Set(existingAchievements.map(a => a.id));
+  const today = new Date().toISOString().split('T')[0];
+  const newAchievements: Achievement[] = [];
+
+  for (const milestone of FOOD_CHALLENGE_MILESTONES) {
+    if (currentStreak >= milestone.streak && !existingIds.has(milestone.id)) {
+      newAchievements.push({
+        id: milestone.id,
+        type: 'milestone',
+        title: milestone.title,
+        description: milestone.description,
+        date: today,
+        icon: milestone.icon,
+      });
+    }
+  }
+
+  if (newAchievements.length > 0) {
+    await storeAchievements([...existingAchievements, ...newAchievements]);
+  }
+
+  return newAchievements;
+}
+
+export async function checkFoodChallengeAchievements(streak: number): Promise<void> {
+  await detectFoodChallengeAchievements(streak);
+}

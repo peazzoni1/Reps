@@ -142,3 +142,21 @@ export interface PatternData {
   feelingTrends: { feeling: FeelingType; count: number }[];
   strengthProgression: { exercise: string; data: { date: string; weight: number }[] }[];
 }
+
+// Daily Food Challenge types
+export type FoodChallengeCategory = 'hydration' | 'fruits' | 'vegetables' | 'mindful' | 'variety';
+
+export interface FoodChallenge {
+  id: string;
+  text: string;
+  category: FoodChallengeCategory;
+  icon: string;
+}
+
+export interface FoodChallengeCompletion {
+  id: string;
+  challengeId: string;
+  date: string;           // YYYY-MM-DD
+  completedAt: string;    // ISO timestamp
+  linkedFoodEntryId?: string;
+}
