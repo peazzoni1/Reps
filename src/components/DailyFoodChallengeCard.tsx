@@ -29,7 +29,7 @@ export default function DailyFoodChallengeCard({
     >
       <View style={styles.card}>
         <View style={styles.headerRow}>
-          <Text style={styles.label}>🌿 DAILY FOOD CHALLENGE</Text>
+          <Text style={styles.label}>🌿 DAILY CHALLENGE</Text>
           {isCompleted && (
             <Text style={styles.badgeIcon}>{challenge.icon}</Text>
           )}
