@@ -584,21 +584,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Greeting Section */}
-      <View style={styles.greetingSection}>
-        <Text style={[styles.greetingLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>
-          {getDayName().toUpperCase()} {getTimeOfDay().toUpperCase()}
-        </Text>
-        <View style={styles.greetingTitleContainer}>
-          <Text style={[styles.greetingTitle, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>
-            Good {getTimeOfDay()},
-          </Text>
-          <Text style={[styles.greetingTitleAccent, fontsLoaded && { fontFamily: 'Nunito_700Bold' }]}>
-            {getMotivationalPhrase()}
-          </Text>
-        </View>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.content, { paddingBottom: 40 }]}
@@ -606,6 +591,48 @@ export default function HomeScreen() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets={true}
       >
+        {/* Daily Food Challenge */}
+        {todayChallenge && (
+          <DailyFoodChallengeCard
+            challenge={todayChallenge}
+            completion={todayChallengeCompletion}
+            streak={challengeStreak}
+            onComplete={handleChallengeComplete}
+          />
+        )}
+
+        {/* Quick Access Tiles */}
+        <View style={styles.tileGrid}>
+          <QuickAccessTile
+            icon="⚡"
+            label="Activity"
+            status={activityStatus}
+            color="#3db88a"
+            onPress={() => setActivityModalVisible(true)}
+          />
+          <QuickAccessTile
+            icon="🍽️"
+            label="Food"
+            status={foodStatus}
+            color="#f5a623"
+            onPress={() => setFoodModalVisible(true)}
+          />
+          <QuickAccessTile
+            icon="✍️"
+            label="Notes"
+            status={notesStatus}
+            color="#7ab8c8"
+            onPress={() => setNotesModalVisible(true)}
+          />
+          <QuickAccessTile
+            icon="⭐"
+            label="Goals"
+            status={goalsStatus}
+            color="#8fbc8f"
+            onPress={() => setGoalsModalVisible(true)}
+          />
+        </View>
+
         {/* AI Coach Daily Check-In */}
         <Animated.View style={styles.coachCardWrapper}>
           <AnimatedLinearGradient
@@ -625,7 +652,7 @@ export default function HomeScreen() {
             <View style={styles.coachCard}>
               <View style={styles.coachCardContent}>
             <View style={styles.coachHeader}>
-              <Text style={[styles.coachLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>✨ AI COACH · DAILY CHECK-IN</Text>
+              <Text style={[styles.coachLabel, fontsLoaded && { fontFamily: 'Nunito_600SemiBold' }]}>✨ DAILY INSIGHTS</Text>
               <TouchableOpacity
                 onPress={() => loadCoachMessage(true)}
                 activeOpacity={0.7}
@@ -639,9 +666,6 @@ export default function HomeScreen() {
                 />
               </TouchableOpacity>
             </View>
-
-            {/* Quota Display */}
-            {checkInQuota && <CheckInQuotaDisplay quota={checkInQuota} />}
 
             {coachLoading ? (
               <View style={styles.coachMessagePlaceholder}>
@@ -693,57 +717,11 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
               </>
-            ) : (
-              <View style={styles.coachEmptyState}>
-                <Text style={styles.coachEmptyText}>Tap the refresh button to get your personalized check-in</Text>
-              </View>
-            )}
+            ) : null}
           </View>
             </View>
           </AnimatedLinearGradient>
         </Animated.View>
-
-        {/* Daily Food Challenge */}
-        {todayChallenge && (
-          <DailyFoodChallengeCard
-            challenge={todayChallenge}
-            completion={todayChallengeCompletion}
-            streak={challengeStreak}
-            onComplete={handleChallengeComplete}
-          />
-        )}
-
-        {/* Quick Access Tiles */}
-        <View style={styles.tileGrid}>
-          <QuickAccessTile
-            icon="⚡"
-            label="Activity"
-            status={activityStatus}
-            color="#3db88a"
-            onPress={() => setActivityModalVisible(true)}
-          />
-          <QuickAccessTile
-            icon="🍽️"
-            label="Food"
-            status={foodStatus}
-            color="#f5a623"
-            onPress={() => setFoodModalVisible(true)}
-          />
-          <QuickAccessTile
-            icon="✍️"
-            label="Notes"
-            status={notesStatus}
-            color="#7ab8c8"
-            onPress={() => setNotesModalVisible(true)}
-          />
-          <QuickAccessTile
-            icon="⭐"
-            label="Goals"
-            status={goalsStatus}
-            color="#8fbc8f"
-            onPress={() => setGoalsModalVisible(true)}
-          />
-        </View>
 
       </ScrollView>
 

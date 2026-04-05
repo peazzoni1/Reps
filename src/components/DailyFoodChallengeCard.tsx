@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodChallenge, FoodChallengeCompletion } from '../types';
 import { Spacing, BorderRadius } from '../theme';
@@ -20,50 +21,65 @@ export default function DailyFoodChallengeCard({
   const isCompleted = completion !== null;
 
   return (
-    <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <Text style={styles.label}>🌿 DAILY FOOD CHALLENGE</Text>
-        {isCompleted && (
-          <Text style={styles.badgeIcon}>{challenge.icon}</Text>
-        )}
-      </View>
-
-      <Text style={styles.challengeText} numberOfLines={2}>
-        {challenge.text}
-      </Text>
-
-      <View style={styles.bottomRow}>
-        <View style={styles.streakContainer}>
-          <Ionicons name="flame-outline" size={14} color="#f5a623" />
-          <Text style={styles.streakText}>
-            {streak} day{streak !== 1 ? 's' : ''}
-          </Text>
+    <LinearGradient
+      colors={['#3db88a', '#7ab8c8', '#3db88a']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradientBorder}
+    >
+      <View style={styles.card}>
+        <View style={styles.headerRow}>
+          <Text style={styles.label}>🌿 DAILY FOOD CHALLENGE</Text>
+          {isCompleted && (
+            <Text style={styles.badgeIcon}>{challenge.icon}</Text>
+          )}
         </View>
 
-        {isCompleted ? (
-          <View style={styles.completedBadge}>
-            <Ionicons name="checkmark-circle" size={16} color="#3db88a" />
-            <Text style={styles.completedText}>Completed</Text>
+        <Text style={styles.challengeText} numberOfLines={2}>
+          {challenge.text}
+        </Text>
+
+        <View style={styles.bottomRow}>
+          <View style={styles.streakContainer}>
+            <Ionicons name="flame-outline" size={14} color="#f5a623" />
+            <Text style={styles.streakText}>
+              {streak} day{streak !== 1 ? 's' : ''}
+            </Text>
           </View>
-        ) : (
-          <TouchableOpacity style={styles.doneButton} onPress={onComplete} activeOpacity={0.8}>
-            <Text style={styles.doneButtonText}>Done</Text>
-          </TouchableOpacity>
-        )}
+
+          {isCompleted ? (
+            <View style={styles.completedBadge}>
+              <Ionicons name="checkmark-circle" size={16} color="#3db88a" />
+              <Text style={styles.completedText}>Completed</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.doneButton} onPress={onComplete} activeOpacity={0.8}>
+              <Text style={styles.doneButtonText}>Done</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#1f2e4f',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
+  gradientBorder: {
+    borderRadius: 24,
+    padding: 1.5,
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  card: {
+    backgroundColor: '#1f2e4f',
+    borderRadius: 22.5,
+    overflow: 'hidden',
+    padding: Spacing.md,
+    shadowColor: '#3db88a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
     gap: 10,
   },
   headerRow: {
