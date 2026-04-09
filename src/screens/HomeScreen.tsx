@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,10 @@ import {
   Modal,
   Alert,
   Switch,
-  Animated,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-
-// Create animated version of LinearGradient
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Nunito_700Bold, Nunito_600SemiBold } from '@expo-google-fonts/nunito';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -133,8 +129,6 @@ export default function HomeScreen() {
   const season = getBlendedTheme();
   const insets = useSafeAreaInsets();
 
-  // Animated glow for AI Coach card border
-  const borderGlowAnim = useRef(new Animated.Value(0)).current;
 
   // Modal visibility states
   const [activityModalVisible, setActivityModalVisible] = useState(false);
@@ -216,23 +210,6 @@ export default function HomeScreen() {
     loadChallengeState();
   }, [loadUserProfile, loadChallengeState]);
 
-  // Animate the coach card border glow
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(borderGlowAnim, {
-          toValue: 1,
-          duration: 5000,
-          useNativeDriver: false,
-        }),
-        Animated.timing(borderGlowAnim, {
-          toValue: 0,
-          duration: 5000,
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
-  }, [borderGlowAnim]);
 
   const loadSubscriptionStatus = useCallback(async () => {
     const subscription = await getSubscriptionStatus();
@@ -598,20 +575,12 @@ export default function HomeScreen() {
         </View>
 
         {/* AI Coach Daily Check-In */}
-        <Animated.View style={styles.coachCardWrapper}>
-          <AnimatedLinearGradient
+        <View style={styles.coachCardWrapper}>
+          <LinearGradient
             colors={['#3db88a', '#7ab8c8', '#3db88a']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[
-              styles.coachCardGradient,
-              {
-                opacity: borderGlowAnim.interpolate({
-                  inputRange: [0, 0.5, 1],
-                  outputRange: [0.6, 1, 0.6],
-                }),
-              },
-            ]}
+            style={styles.coachCardGradient}
           >
             <View style={styles.coachCard}>
               <View style={styles.coachCardContent}>
@@ -684,8 +653,8 @@ export default function HomeScreen() {
             ) : null}
           </View>
             </View>
-          </AnimatedLinearGradient>
-        </Animated.View>
+          </LinearGradient>
+        </View>
 
       </ScrollView>
 
