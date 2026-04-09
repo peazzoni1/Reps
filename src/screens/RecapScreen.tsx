@@ -116,6 +116,9 @@ export default function TrackingScreen() {
   const todayDate = new Date();
   const todayStr = toLocalDateStr(todayDate);
 
+  // View mode toggle
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+
   // Calendar navigation
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
@@ -480,6 +483,56 @@ export default function TrackingScreen() {
     );
   };
 
+  // ── List view helpers ───────────────────────────────────────────────────────
+
+  const listDates = useMemo<string[]>(() => {
+    const dateSet = new Set<string>();
+    allSessions.forEach(s => dateSet.add(toLocalDateStr(new Date(s.date))));
+    allFoodEntries.forEach(f => dateSet.add(toLocalDateStr(new Date(f.date))));
+    dailyNotes.forEach(n => dateSet.add(n.date));
+    return Array.from(dateSet).sort((a, b) => b.localeCompare(a));
+  }, [allSessions, allFoodEntries, dailyNotes]);
+
+  const renderListDay = (date: string) => {
+    const exercises = allSessions.filter(s => toLocalDateStr(new Date(s.date)) === date);
+    const food = allFoodEntries.filter(f => toLocalDateStr(new Date(f.date)) === date);
+    const note = dailyNotes.find(n => n.date === date);
+
+    return (
+      <View key={date} style={styles.listDaySection}>
+        <View style={styles.listDayHeadingRow}>
+          <Text style={styles.listDayHeading}>{formatDateHeading(date)}</Text>
+          <TouchableOpacity
+            style={styles.listAddBtn}
+            onPress={() => { setDaySheetDate(date); setDaySheetVisible(true); }}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons name="add" size={16} color={ACTIVITY_COLOR} />
+          </TouchableOpacity>
+        </View>
+
+        {exercises.length > 0 && (
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>EXERCISE</Text>
+            {exercises.map(renderExerciseItem)}
+          </View>
+        )}
+        {food.length > 0 && (
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>FOOD</Text>
+            {food.map(renderFoodItem)}
+          </View>
+        )}
+        {note && (
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>NOTES</Text>
+            {renderNoteItem(note)}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -487,13 +540,31 @@ export default function TrackingScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <Text style={styles.headerTitle}>Log</Text>
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            style={[styles.viewToggleBtn, viewMode === 'calendar' && styles.viewToggleBtnActive]}
+            onPress={() => setViewMode('calendar')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar-outline" size={15} color={viewMode === 'calendar' ? '#fff' : 'rgba(255,255,255,0.45)'} />
+            <Text style={[styles.viewToggleText, viewMode === 'calendar' && styles.viewToggleTextActive]}>Calendar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActive]}
+            onPress={() => setViewMode('list')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="list-outline" size={15} color={viewMode === 'list' ? '#fff' : 'rgba(255,255,255,0.45)'} />
+            <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>List</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={ACTIVITY_COLOR} />
         </View>
-      ) : (
+      ) : viewMode === 'calendar' ? (
         <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing.xxl }]}
           showsVerticalScrollIndicator={false}
@@ -547,6 +618,18 @@ export default function TrackingScreen() {
               <Text style={styles.legendText}>Notes</Text>
             </View>
           </View>
+        </ScrollView>
+      ) : listDates.length === 0 ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyTitle}>Nothing logged yet</Text>
+          <Text style={styles.emptySubtitle}>Log activity, food, or notes on the Today tab to see them here.</Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={[styles.listScrollContent, { paddingBottom: insets.bottom + Spacing.xxl }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {listDates.map(renderListDay)}
         </ScrollView>
       )}
 
@@ -898,12 +981,42 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(31,46,79,0.97)',
     borderBottomWidth: 0.5,
     borderBottomColor: 'rgba(255,255,255,0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerTitle: {
     ...Typography.headline,
     color: '#ffffff',
     fontSize: 28,
     fontWeight: '700',
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    padding: 2,
+    gap: 2,
+  },
+  viewToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  viewToggleBtnActive: {
+    backgroundColor: 'rgba(61,184,138,0.25)',
+  },
+  viewToggleText: {
+    ...Typography.caption1,
+    color: 'rgba(255,255,255,0.45)',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  viewToggleTextActive: {
+    color: '#ffffff',
   },
   center: {
     flex: 1,
@@ -914,6 +1027,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: CALENDAR_PADDING,
     paddingTop: Spacing.xl,
     gap: Spacing.md,
+  },
+  listScrollContent: {
+    padding: Spacing.base,
+    gap: Spacing.xl,
+  },
+  emptyTitle: {
+    ...Typography.title3,
+    color: '#ffffff',
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  emptySubtitle: {
+    ...Typography.subheadline,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: Spacing.xxl,
+  },
+  listDaySection: {
+    gap: Spacing.sm,
+  },
+  listDayHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  listDayHeading: {
+    ...Typography.footnote,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  listAddBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(61,184,138,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Calendar ────────────────────────────────────────────────────────────────
