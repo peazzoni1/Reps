@@ -20,6 +20,7 @@ import { FoodEntry, MealType, MovementSession, MovementType, FeelingType } from 
 import {
   getAllMovementSessions,
   getAllFoodEntries,
+  createMovementSession,
   createFoodEntry,
   updateFoodEntry,
   updateMovementSession,
@@ -147,6 +148,14 @@ export default function TrackingScreen() {
   const [noteContent, setNoteContent] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
+  // New activity creation modal state
+  const [newActivityModalVisible, setNewActivityModalVisible] = useState(false);
+  const [newActivityType, setNewActivityType] = useState<MovementType | null>(null);
+  const [newActivityFeelings, setNewActivityFeelings] = useState<FeelingType[]>([]);
+  const [newActivityNote, setNewActivityNote] = useState('');
+  const [newActivityDate, setNewActivityDate] = useState<string>(todayStr);
+  const [savingNewActivity, setSavingNewActivity] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     const [sessions, foodEntries, customTypes, notes] = await Promise.all([
@@ -210,8 +219,6 @@ export default function TrackingScreen() {
   };
 
   const handleDayPress = (dateStr: string) => {
-    const data = dateDataMap.get(dateStr);
-    if (!data) return;
     setDaySheetDate(dateStr);
     setDaySheetVisible(true);
   };
@@ -227,13 +234,40 @@ export default function TrackingScreen() {
 
   // ── Food modal ──────────────────────────────────────────────────────────────
 
-  const openModal = (entry?: FoodEntry) => {
+  const openModal = (entry?: FoodEntry, presetDate?: string) => {
     setDaySheetVisible(false);
     setEditingEntry(entry ?? null);
     setFoodDescription(entry?.description ?? '');
     setSelectedMeal(entry?.meal ?? null);
-    setSelectedDate(entry ? toLocalDateStr(new Date(entry.date)) : todayStr);
+    setSelectedDate(entry ? toLocalDateStr(new Date(entry.date)) : (presetDate ?? todayStr));
     setModalVisible(true);
+  };
+
+  const openNewActivityModal = (date: string) => {
+    setDaySheetVisible(false);
+    setNewActivityType(null);
+    setNewActivityFeelings([]);
+    setNewActivityNote('');
+    setNewActivityDate(date);
+    setNewActivityModalVisible(true);
+  };
+
+  const handleSaveNewActivity = async () => {
+    if (!newActivityType || newActivityFeelings.length === 0) return;
+    setSavingNewActivity(true);
+    const typeData = [...MOVEMENT_TYPES, ...customMovementTypes].find(m => m.id === newActivityType);
+    await createMovementSession(
+      newActivityType,
+      newActivityFeelings,
+      typeData?.label ?? newActivityType,
+      newActivityNote.trim() || undefined,
+      undefined,
+      newActivityDate,
+    );
+    clearTodayDailyMessage();
+    setSavingNewActivity(false);
+    setNewActivityModalVisible(false);
+    load();
   };
 
   const handleSaveFood = async () => {
@@ -424,7 +458,7 @@ export default function TrackingScreen() {
         key={cell.date}
         style={styles.dayCell}
         onPress={() => handleDayPress(cell.date)}
-        disabled={!hasData || isFuture}
+        disabled={isFuture}
         activeOpacity={0.65}
       >
         <View style={[styles.dayCircle, isToday && styles.todayCircle]}>
@@ -549,9 +583,107 @@ export default function TrackingScreen() {
                   {renderNoteItem(daySheetEntries.note)}
                 </View>
               )}
+
+              {/* Log actions */}
+              <View style={styles.logActionsRow}>
+                <TouchableOpacity
+                  style={[styles.logActionBtn, { borderColor: `${ACTIVITY_COLOR}50` }]}
+                  onPress={() => daySheetDate && openNewActivityModal(daySheetDate)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="pulse-outline" size={18} color={ACTIVITY_COLOR} />
+                  <Text style={[styles.logActionText, { color: ACTIVITY_COLOR }]}>Activity</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.logActionBtn, { borderColor: `${FOOD_COLOR}50` }]}
+                  onPress={() => daySheetDate && openModal(undefined, daySheetDate)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.logActionIcon}>🍽</Text>
+                  <Text style={[styles.logActionText, { color: FOOD_COLOR }]}>Food</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.logActionBtn, { borderColor: `${NOTES_COLOR}50` }]}
+                  onPress={() => daySheetDate && openNotesModal(daySheetDate, daySheetEntries.note ?? undefined)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="document-text-outline" size={18} color={NOTES_COLOR} />
+                  <Text style={[styles.logActionText, { color: NOTES_COLOR }]}>Note</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* ── New activity modal ───────────────────────────────────────────── */}
+      <Modal visible={newActivityModalVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setNewActivityModalVisible(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[styles.modalScrollContent, { paddingBottom: insets.bottom + Spacing.xxl }]}
+            >
+              <Text style={styles.modalTitle}>Log Activity</Text>
+
+              <Text style={styles.modalLabel}>Activity</Text>
+              <View style={styles.pillRow}>
+                {[...MOVEMENT_TYPES, ...customMovementTypes].map(type => (
+                  <TouchableOpacity
+                    key={type.id}
+                    style={[styles.pill, newActivityType === type.id && styles.pillSelected]}
+                    onPress={() => setNewActivityType(type.id as MovementType)}
+                  >
+                    <Text style={styles.pillIcon}>{type.icon}</Text>
+                    <Text style={[styles.pillText, newActivityType === type.id && styles.pillTextSelected]}>{type.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.modalLabel}>How did it feel? (up to 3)</Text>
+              <View style={styles.pillRow}>
+                {FEELINGS.map(f => {
+                  const isSelected = newActivityFeelings.includes(f.id);
+                  const isDisabled = !isSelected && newActivityFeelings.length >= 3;
+                  return (
+                    <TouchableOpacity
+                      key={f.id}
+                      style={[styles.pill, isSelected && styles.pillSelected, isDisabled && { opacity: 0.35 }]}
+                      onPress={() => {
+                        if (isSelected) setNewActivityFeelings(prev => prev.filter(x => x !== f.id));
+                        else if (!isDisabled) setNewActivityFeelings(prev => [...prev, f.id]);
+                      }}
+                    >
+                      <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>{f.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.modalLabel}>Note (optional)</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newActivityNote}
+                onChangeText={setNewActivityNote}
+                placeholder="Anything you want to remember..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                multiline
+                maxLength={300}
+              />
+
+              <TouchableOpacity
+                style={[styles.modalSave, (!newActivityType || newActivityFeelings.length === 0 || savingNewActivity) && styles.modalSaveDisabled]}
+                onPress={handleSaveNewActivity}
+                disabled={!newActivityType || newActivityFeelings.length === 0 || savingNewActivity}
+              >
+                {savingNewActivity ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSaveText}>Save</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Food log modal ────────────────────────────────────────────────── */}
@@ -912,6 +1044,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xl,
     gap: Spacing.md,
+  },
+
+  // ── Log action buttons ───────────────────────────────────────────────────────
+  logActionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    paddingTop: Spacing.sm,
+  },
+  logActionBtn: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: Spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  logActionText: {
+    ...Typography.caption1,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  logActionIcon: {
+    fontSize: 18,
   },
 
   // ── Category blocks (shared between day sheet and edit modals) ───────────────
