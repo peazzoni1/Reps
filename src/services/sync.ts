@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-import { MovementSession, FoodEntry, CoachSession, Goal, FoodChallengeCompletion } from '../types';
+import { MovementSession, FoodEntry, CoachSession, Goal, GoalPeriodRecord, FoodChallengeCompletion } from '../types';
 
 // ─── Storage keys (mirrors storage.ts) ─────────────────────────────────────
 const MOVEMENT_SESSIONS_KEY = '@reps_movement_sessions';
@@ -11,6 +11,7 @@ const ACTIVITY_PREFS_KEY = '@reps_activity_preferences';
 const COACH_SESSIONS_KEY = '@coach_sessions';
 const SUBSCRIPTION_STATUS_KEY = '@reps_subscription_status';
 const GOALS_KEY = '@reps_goals';
+const GOAL_PERIODS_KEY = '@reps_goal_periods';
 const FOOD_CHALLENGE_COMPLETIONS_KEY = '@reps_food_challenge_completions';
 
 // ─── Private helpers ────────────────────────────────────────────────────────
@@ -75,6 +76,21 @@ function toGoal(row: any): Goal {
   };
 }
 
+function toGoalPeriodRecord(row: any): GoalPeriodRecord {
+  return {
+    id: row.id,
+    goalId: row.goal_id,
+    userId: row.user_id,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    targetPeriod: row.target_period,
+    targetValue: row.target_value,
+    progress: row.progress,
+    completed: row.completed,
+    createdAt: row.created_at,
+  };
+}
+
 function toFoodChallengeCompletion(row: any): FoodChallengeCompletion {
   return {
     id: row.id,
@@ -96,6 +112,7 @@ export async function syncFromSupabase(userId: string): Promise<void> {
       { data: prefsData },
       { data: profileData },
       { data: goalsData },
+      { data: goalPeriodsData },
       { data: foodChallengeData },
     ] = await Promise.all([
       supabase.from('movement_sessions').select('*').eq('user_id', userId),
@@ -104,6 +121,7 @@ export async function syncFromSupabase(userId: string): Promise<void> {
       supabase.from('user_preferences').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('user_profiles').select('subscription_tier, subscription_status, subscription_expires_at').eq('user_id', userId).maybeSingle(),
       supabase.from('goals').select('*').eq('user_id', userId),
+      supabase.from('goal_periods').select('*').eq('user_id', userId),
       supabase.from('food_challenge_completions').select('*').eq('user_id', userId),
     ]);
 
@@ -121,6 +139,9 @@ export async function syncFromSupabase(userId: string): Promise<void> {
     }
     if (goalsData?.length) {
       pairs.push([`${GOALS_KEY}_${userId}`, JSON.stringify(goalsData.map(toGoal))]);
+    }
+    if (goalPeriodsData?.length) {
+      pairs.push([`${GOAL_PERIODS_KEY}`, JSON.stringify(goalPeriodsData.map(toGoalPeriodRecord))]);
     }
     if (foodChallengeData?.length) {
       pairs.push([`${FOOD_CHALLENGE_COMPLETIONS_KEY}_${userId}`, JSON.stringify(foodChallengeData.map(toFoodChallengeCompletion))]);
@@ -288,6 +309,38 @@ export async function removeGoal(id: string): Promise<void> {
     await supabase.from('goals').delete().eq('id', id).eq('user_id', userId);
   } catch (error) {
     console.error('[sync] removeGoal error:', error);
+  }
+}
+
+// ─── Goal Periods ─────────────────────────────────────────────────────────────
+export async function syncGoalPeriodRecord(record: GoalPeriodRecord): Promise<void> {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from('goal_periods').upsert({
+      id: record.id,
+      goal_id: record.goalId,
+      user_id: userId,
+      period_start: record.periodStart,
+      period_end: record.periodEnd,
+      target_period: record.targetPeriod,
+      target_value: record.targetValue,
+      progress: record.progress,
+      completed: record.completed,
+      created_at: record.createdAt,
+    });
+  } catch (error) {
+    console.error('[sync] syncGoalPeriodRecord error:', error);
+  }
+}
+
+export async function removeGoalPeriodRecordsForGoal(goalId: string): Promise<void> {
+  try {
+    const userId = await getUserId();
+    if (!userId) return;
+    await supabase.from('goal_periods').delete().eq('goal_id', goalId).eq('user_id', userId);
+  } catch (error) {
+    console.error('[sync] removeGoalPeriodRecordsForGoal error:', error);
   }
 }
 

@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Goal, GoalType, TargetPeriod, MovementType, MovementSession } from '../types';
+import { Goal, GoalType, GoalPeriodRecord, TargetPeriod, MovementType, MovementSession } from '../types';
 import { getAllMovementSessions } from './storage';
 import * as Sync from './sync';
 
 const GOALS_KEY = '@reps_goals';
+const GOAL_PERIODS_KEY = '@reps_goal_periods';
 
 // Helper function to generate unique IDs
 const generateId = (): string => {
@@ -75,6 +76,9 @@ export const deleteGoal = async (id: string): Promise<boolean> => {
 
   // Cleanup: Remove goal ID from all movement sessions
   await cleanupDeletedGoalFromSessions(id);
+
+  // Cleanup: Remove all period records for this goal
+  await deleteGoalPeriodRecordsForGoal(id);
 
   return true;
 };
@@ -173,11 +177,26 @@ export const calculateGoalProgress = async (goal: Goal): Promise<number> => {
 };
 
 /**
- * Update progress for a specific goal
+ * Update progress for a specific goal, snapshotting the previous period if it has rolled over
  */
 export const updateGoalProgress = async (goalId: string): Promise<void> => {
   const goal = await getGoalById(goalId);
   if (!goal) return;
+
+  // Detect period rollover for recurring periods (not custom)
+  if (goal.targetPeriod !== 'custom') {
+    const currentPeriodRange = getPeriodDateRange(goal.targetPeriod, goal.startDate);
+    const lastCalcDate = goal.lastCalculated.split('T')[0];
+
+    // If last calculation was before the current period started, the period has rolled over
+    if (lastCalcDate < currentPeriodRange.start) {
+      const prevPeriodRange = getPeriodRangeForDate(goal.targetPeriod, lastCalcDate);
+      // Only snapshot if the previous period is within the goal's overall date range
+      if (prevPeriodRange.start >= goal.startDate) {
+        await snapshotGoalPeriod(goal, prevPeriodRange.start, prevPeriodRange.end);
+      }
+    }
+  }
 
   const progress = await calculateGoalProgress(goal);
   await updateGoal(goalId, {
@@ -240,6 +259,126 @@ const cleanupDeletedGoalFromSessions = async (goalId: string): Promise<void> => 
   if (modified) {
     await AsyncStorage.setItem('@reps_movement_sessions', JSON.stringify(updatedSessions));
   }
+};
+
+// ==================== Period Records ====================
+
+/**
+ * Get all goal period records from storage
+ */
+export const getAllGoalPeriodRecords = async (): Promise<GoalPeriodRecord[]> => {
+  try {
+    const data = await AsyncStorage.getItem(GOAL_PERIODS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Get all period records for a specific goal, sorted newest first
+ */
+export const getGoalPeriodRecords = async (goalId: string): Promise<GoalPeriodRecord[]> => {
+  const all = await getAllGoalPeriodRecords();
+  return all
+    .filter(r => r.goalId === goalId)
+    .sort((a, b) => b.periodStart.localeCompare(a.periodStart));
+};
+
+/**
+ * Save a period record (upsert by goalId + periodStart)
+ */
+export const saveGoalPeriodRecord = async (record: GoalPeriodRecord): Promise<void> => {
+  const all = await getAllGoalPeriodRecords();
+  const existingIndex = all.findIndex(
+    r => r.goalId === record.goalId && r.periodStart === record.periodStart
+  );
+  if (existingIndex >= 0) {
+    all[existingIndex] = record;
+  } else {
+    all.push(record);
+  }
+  await AsyncStorage.setItem(GOAL_PERIODS_KEY, JSON.stringify(all));
+  Sync.syncGoalPeriodRecord(record);
+};
+
+/**
+ * Delete all period records for a goal (called when goal is deleted)
+ */
+export const deleteGoalPeriodRecordsForGoal = async (goalId: string): Promise<void> => {
+  const all = await getAllGoalPeriodRecords();
+  const filtered = all.filter(r => r.goalId !== goalId);
+  await AsyncStorage.setItem(GOAL_PERIODS_KEY, JSON.stringify(filtered));
+  Sync.removeGoalPeriodRecordsForGoal(goalId);
+};
+
+/**
+ * Get the full period date range (start to end) for the period containing a given date
+ */
+export const getPeriodRangeForDate = (
+  period: TargetPeriod,
+  dateStr: string
+): { start: string; end: string } => {
+  // Use noon to avoid timezone edge cases
+  const date = new Date(`${dateStr}T12:00:00`);
+
+  switch (period) {
+    case 'daily':
+      return { start: dateStr, end: dateStr };
+
+    case 'weekly': {
+      const dayOfWeek = date.getDay();
+      const sunday = new Date(date);
+      sunday.setDate(date.getDate() - dayOfWeek);
+      const saturday = new Date(sunday);
+      saturday.setDate(sunday.getDate() + 6);
+      return {
+        start: sunday.toISOString().split('T')[0],
+        end: saturday.toISOString().split('T')[0],
+      };
+    }
+
+    case 'monthly': {
+      const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      return {
+        start: firstDay.toISOString().split('T')[0],
+        end: lastDay.toISOString().split('T')[0],
+      };
+    }
+
+    default:
+      return { start: dateStr, end: dateStr };
+  }
+};
+
+/**
+ * Snapshot a goal's current progress for a completed period
+ */
+const snapshotGoalPeriod = async (
+  goal: Goal,
+  periodStart: string,
+  periodEnd: string
+): Promise<void> => {
+  // Check if a record already exists for this period (avoid duplicates)
+  const existing = await getGoalPeriodRecords(goal.id);
+  const alreadyExists = existing.some(r => r.periodStart === periodStart);
+  if (alreadyExists) return;
+
+  const record: GoalPeriodRecord = {
+    id: `${goal.id}-${periodStart}`,
+    goalId: goal.id,
+    userId: goal.userId,
+    periodStart,
+    periodEnd,
+    targetPeriod: goal.targetPeriod,
+    targetValue: goal.targetValue,
+    progress: goal.currentProgress,
+    completed: goal.currentProgress >= goal.targetValue,
+    createdAt: new Date().toISOString(),
+  };
+
+  await saveGoalPeriodRecord(record);
 };
 
 // ==================== Helper Functions ====================

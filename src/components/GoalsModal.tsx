@@ -22,6 +22,7 @@ import {
   recalculateAllGoalProgress,
 } from '../services/goals';
 import GoalCard from './GoalCard';
+import GoalDetailModal from './GoalDetailModal';
 
 interface GoalsModalProps {
   visible: boolean;
@@ -44,6 +45,7 @@ export default function GoalsModal({
   const [goals, setGoals] = useState<Goal[]>([]);
   const [filter, setFilter] = useState<FilterType>('active');
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
 
   const loadGoals = useCallback(async () => {
     try {
@@ -204,7 +206,7 @@ export default function GoalsModal({
                     key={goal.id}
                     goal={goal}
                     season={season}
-                    onPress={() => {}}
+                    onPress={() => setSelectedGoal(goal)}
                     onEdit={() => onEditGoal(goal)}
                     onDelete={() => handleDeleteGoal(goal)}
                   />
@@ -237,6 +239,23 @@ export default function GoalsModal({
           </ScrollView>
         </View>
       </View>
+
+      <GoalDetailModal
+        visible={selectedGoal !== null}
+        goal={selectedGoal}
+        season={season}
+        onClose={() => setSelectedGoal(null)}
+        onEdit={() => {
+          const goal = selectedGoal;
+          setSelectedGoal(null);
+          if (goal) onEditGoal(goal);
+        }}
+        onDelete={() => {
+          const goal = selectedGoal;
+          setSelectedGoal(null);
+          if (goal) handleDeleteGoal(goal);
+        }}
+      />
     </Modal>
   );
 }

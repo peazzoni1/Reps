@@ -94,6 +94,19 @@ export interface CheckInQuota {
 export type GoalType = 'activity_count' | 'streak' | 'custom';
 export type TargetPeriod = 'daily' | 'weekly' | 'monthly' | 'custom';
 
+export interface GoalPeriodRecord {
+  id: string;
+  goalId: string;
+  userId: string;
+  periodStart: string; // YYYY-MM-DD
+  periodEnd: string;   // YYYY-MM-DD
+  targetPeriod: TargetPeriod;
+  targetValue: number;
+  progress: number;
+  completed: boolean;
+  createdAt: string;
+}
+
 export interface Goal {
   id: string;
   userId: string;
